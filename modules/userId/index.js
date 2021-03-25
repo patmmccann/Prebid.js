@@ -130,6 +130,7 @@
   */
 
 import find from 'core-js-pure/features/array/find.js';
+import findIndex from 'core-js-pure/features/array/find-index.js';
 import { config } from '../../src/config.js';
 import events from '../../src/events.js';
 import * as utils from '../../src/utils.js';
@@ -819,6 +820,16 @@ export function init(config) {
       syncDelay = utils.isNumber(userSync.syncDelay) ? userSync.syncDelay : DEFAULT_SYNC_DELAY;
       auctionDelay = utils.isNumber(userSync.auctionDelay) ? userSync.auctionDelay : NO_AUCTION_DELAY;
       updateSubmodules();
+    }
+    // userSync.ppid should be one of the 'source' values in getUserIdsAsEids() eg pubcid.org or id5-sync.com
+    if (userSync && userSync.userIds && userSync.ppid && findIndex(getUserIdsAsEids(), x => x.source === userSync.ppid) >= 0 && typeof getUserIdsAsEids().find(x => x.source === userSync.ppid).uids[0].id === 'string') {
+      window.googletag = window.googletag || { cmd: [] };
+      const ppid = getUserIdsAsEids().find(x => x.source === userSync.ppid).uids[0].id.replace(/[\W_]/g, '');
+      if (ppid.length >= 32 && ppid.length <= 150) {
+        window.googletag.cmd.push(function() {
+          window.googletag.pubads().setPublisherProvidedId(ppid)
+        });
+      }
     }
   });
 
