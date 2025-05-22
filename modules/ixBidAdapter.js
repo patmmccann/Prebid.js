@@ -957,7 +957,7 @@ function applyRegulations(r, bidderRequest) {
  * @param  {Array}  impressions        List of impressions to be added to the request.
  * @param  {Array}  impKeys            List of impression keys.
  * @param  {object} r                  Reuqest object.
- * @param  {number}    adUnitIndex        Index of the current add unit
+ * @param  {number}    adUnitIndex        Index of the current ad unit
  * @return {object}                    Reqyest object with added impressions describing the request to the server.
  */
 function addImpressions(impressions, impKeys, r, adUnitIndex) {
@@ -1254,7 +1254,7 @@ function addAdUnitFPD(imp, bid) {
  * @param  {Array}  impressions        List of impressions to be added to the request.
  * @param  {object} r                  Reuqest object.
  * @param  {Array}  impKeys            List of impression keys.
- * @param  {number}    adUnitIndex        Index of the current add unit
+ * @param  {number}    adUnitIndex        Index of the current ad unit
  * @param  {object} payload            Request payload object.
  * @param  {string} baseUrl            Base exchagne URL.
  * @return {object}                    Reqyest object with added indentigfier info to ixDiag.
