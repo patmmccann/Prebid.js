@@ -322,6 +322,19 @@ describe('Sovrn Analytics Adapter', function () {
       expect(bidRequest).to.not.have.property('adserverTargeting');
       expect(bidRequest).to.not.have.property('cpm');
       expect(currentAuction.auction.unsynced[0]).to.deep.equal(bidResponseNoMatchingRequest);
+      expect(server.requests.length).to.equal(0);
+    });
+
+    it('should handle missing bidder on bid adjustment without error', function () {
+      let auctionId = '456.456.456.457';
+      emitEvent('AUCTION_INIT', auctionInit, auctionId);
+      emitEvent('BID_REQUESTED', bidRequested, auctionId);
+      emitEvent('BID_ADJUSTMENT', bidAdjustmentNoMatchingRequest, auctionId);
+
+      let auctionData = sovrnAnalyticsAdapter.getAuctions();
+      let currentAuction = auctionData[auctionId];
+      expect(currentAuction.auction.unsynced[0]).to.deep.equal(bidAdjustmentNoMatchingRequest);
+      expect(server.requests.length).to.equal(0);
     });
     it('should adjust the bid ', function () {
       let auctionId = '567.567.567.567';

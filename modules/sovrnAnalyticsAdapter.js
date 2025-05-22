@@ -171,6 +171,7 @@ class AuctionData {
     const bidder = find(this.auction.requests, r => (r.bidderCode === event.bidderCode))
     if (!bidder) {
       this.auction.unsynced.push(JSON.parse(JSON.stringify(event)))
+      return undefined
     }
     let bid = find(bidder.bids, b => (b.bidId === event.requestId))
 
