@@ -3,6 +3,9 @@ var path = require('path');
 module.exports = {
   mode: 'production',
   devtool: 'source-map',
+  cache: {
+    type: 'filesystem'
+  },
   resolve: {
     modules: [
       path.resolve('.'),
@@ -21,7 +24,11 @@ module.exports = {
         exclude: path.resolve('./node_modules'), // required to prevent loader from choking non-Prebid.js node_modules
         use: [
           {
-            loader: 'babel-loader'
+            loader: 'babel-loader',
+            options: {
+              cacheDirectory: true,
+              cacheCompression: false
+            }
           }
         ]
       },

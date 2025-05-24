@@ -40,6 +40,9 @@ if (argv.analyze) {
 module.exports = {
   mode: 'production',
   devtool: 'source-map',
+  cache: {
+    type: 'filesystem'
+  },
   resolve: {
     modules: [
       path.resolve('.'),
@@ -78,7 +81,10 @@ module.exports = {
         use: [
           {
             loader: 'babel-loader',
-            options: Object.assign({}, babelConfig, helpers.getAnalyticsOptions()),
+            options: Object.assign({
+              cacheDirectory: true,
+              cacheCompression: false
+            }, babelConfig, helpers.getAnalyticsOptions()),
           }
         ]
       },
@@ -88,7 +94,10 @@ module.exports = {
         use: [
           {
             loader: 'babel-loader',
-            options: babelConfig
+            options: Object.assign({
+              cacheDirectory: true,
+              cacheCompression: false
+            }, babelConfig)
           }
         ],
       }
