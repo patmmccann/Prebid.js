@@ -1244,6 +1244,50 @@ describe('Utils', function () {
   });
 });
 
+describe('scheduleBackgroundTask', () => {
+  let origScheduler;
+
+  beforeEach(() => {
+    origScheduler = window.scheduler;
+  });
+
+  afterEach(() => {
+    window.scheduler = origScheduler;
+  });
+
+  it('uses scheduler.postTask when available', () => {
+    const fn = sinon.spy();
+    const ret = {};
+    const postTask = sinon.stub().returns(ret);
+    window.scheduler = {postTask};
+
+    const result = utils.scheduleBackgroundTask(fn);
+
+    expect(result).to.equal(ret);
+    expect(postTask.calledOnceWithExactly(fn, {priority: 'background'})).to.be.true;
+    expect(fn.called).to.be.false;
+  });
+
+  it('uses scheduler.yield when postTask is unavailable', async () => {
+    const fn = sinon.spy();
+    const yieldStub = sinon.stub().resolves();
+    window.scheduler = {yield: yieldStub};
+
+    await utils.scheduleBackgroundTask(fn);
+
+    expect(yieldStub.calledOnce).to.be.true;
+    expect(fn.calledOnce).to.be.true;
+  });
+
+  it('falls back to a microtask when scheduler is missing', async () => {
+    const fn = sinon.spy();
+    delete window.scheduler;
+
+    await utils.scheduleBackgroundTask(fn);
+
+    expect(fn.calledOnce).to.be.true;
+  });
+});
 describe('memoize', () => {
   let fn;
 
