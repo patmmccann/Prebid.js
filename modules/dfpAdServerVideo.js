@@ -74,7 +74,7 @@ export const VAST_TAG_URI_TAGNAME = 'VASTAdTagURI';
  */
 export function buildDfpVideoUrl(options) {
   if (!options.params && !options.url) {
-    logError(`A params object or a url is required to use $$PREBID_GLOBAL$$.adServers.dfp.buildVideoUrl`);
+    logError(`A params object or a url is required to use $$PREBID_GLOBAL$$.adServers.gam.buildVideoUrl`);
     return;
   }
 

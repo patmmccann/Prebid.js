@@ -22,9 +22,9 @@ export const adpodUtils = {};
  */
 export function buildAdpodVideoUrl({code, params, callback} = {}) {
   // TODO: the public API for this does not take in enough info to fill all DFP params (adUnit/bid),
-  // and is marked "alpha": https://docs.prebid.org/dev-docs/publisher-api-reference/adServers.dfp.buildAdpodVideoUrl.html
+  // and is marked "alpha": https://docs.prebid.org/dev-docs/publisher-api-reference/adServers.gam.buildAdpodVideoUrl.html
   if (!params || !callback) {
-    logError(`A params object and a callback is required to use pbjs.adServers.dfp.buildAdpodVideoUrl`);
+    logError(`A params object and a callback is required to use pbjs.adServers.gam.buildAdpodVideoUrl`);
     return;
   }
 
