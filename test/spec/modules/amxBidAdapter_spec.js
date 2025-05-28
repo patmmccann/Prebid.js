@@ -730,6 +730,11 @@ describe('AmxBidAdapter', () => {
 
     beforeEach(() => {
       firedPixels = [];
+      sinon.stub(utils, 'scheduleBackgroundTask').callsFake(fn => { fn(); return Promise.resolve(); });
+    });
+
+    afterEach(() => {
+      utils.scheduleBackgroundTask.restore();
     });
 
     after(() => {

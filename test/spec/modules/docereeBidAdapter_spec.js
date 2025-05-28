@@ -106,9 +106,14 @@ describe('BidlabBidAdapter', function () {
   describe('onBidWon', function () {
     beforeEach(function() {
       sinon.stub(utils, 'triggerPixel');
+      sinon.stub(utils, 'scheduleBackgroundTask').callsFake(fn => {
+        fn();
+        return Promise.resolve();
+      });
     });
     afterEach(function() {
       utils.triggerPixel.restore();
+      utils.scheduleBackgroundTask.restore();
     });
     it('exists and is a function', () => {
       expect(spec.onBidWon).to.exist.and.to.be.a('function');
@@ -122,9 +127,14 @@ describe('BidlabBidAdapter', function () {
   describe('onTimeout', function () {
     beforeEach(function() {
       sinon.stub(utils, 'triggerPixel');
+      sinon.stub(utils, 'scheduleBackgroundTask').callsFake(fn => {
+        fn();
+        return Promise.resolve();
+      });
     });
     afterEach(function() {
       utils.triggerPixel.restore();
+      utils.scheduleBackgroundTask.restore();
     });
     it('exists and is a function', () => {
       expect(spec.onTimeout).to.exist.and.to.be.a('function');

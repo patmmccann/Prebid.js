@@ -24,6 +24,7 @@ describe('bridgeuppBidAdapter_spec', function () {
     utilsMock.restore();
     ajaxStub.restore();
     fetchStub.restore();
+    utils.scheduleBackgroundTask.restore();
   });
 
   beforeEach(function () {
@@ -31,6 +32,7 @@ describe('bridgeuppBidAdapter_spec', function () {
     utilsMock = sinon.mock(utils);
     ajaxStub = sandbox.stub(ajax, 'ajax');
     fetchStub = sinon.stub(global, 'fetch').resolves(new Response('OK'));
+    sinon.stub(utils, 'scheduleBackgroundTask').callsFake(fn => { fn(); return Promise.resolve(); });
   });
 
   describe('isBidRequestValid', function () {
