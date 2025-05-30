@@ -445,14 +445,6 @@ function testCoverage(done) {
   }, done);
 }
 
-function coveralls() { // 2nd arg is a dependency: 'test' must be finished
-  // first send results of istanbul's test coverage to coveralls.io.
-  return gulp.src('gulpfile.js', { read: false }) // You have to give it a file, but you don't
-    // have to read it.
-    .pipe(shell('cat build/coverage/lcov.info | node_modules/coveralls/bin/coveralls.js'));
-}
-
-// This task creates postbid.js. Postbid setup is different from prebid.js
 // More info can be found here http://prebid.org/overview/what-is-post-bid.html
 
 function buildPostbid() {
@@ -547,7 +539,6 @@ gulp.task('test', gulp.series(clean, lint, 'test-all-features-disabled', 'test-o
 gulp.task('test-coverage', gulp.series(clean, testCoverage));
 gulp.task(viewCoverage);
 
-gulp.task('coveralls', gulp.series('test-coverage', coveralls));
 
 // npm will by default use .gitignore, so create an .npmignore that is a copy of it except it includes "dist"
 gulp.task('setup-npmignore', shell.task("sed 's/^\\/\\?dist\\/\\?$//g;w .npmignore' .gitignore", {quiet: true}));
