@@ -445,6 +445,7 @@ function testCoverage(done) {
   }, done);
 }
 
+// This task creates postbid.js. Postbid setup is different from prebid.js
 // More info can be found here http://prebid.org/overview/what-is-post-bid.html
 
 function buildPostbid() {
