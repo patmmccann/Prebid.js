@@ -102,7 +102,6 @@ describe('the rubicon adapter', function () {
             accountId: '14062',
             siteId: '70608',
             zoneId: '335918',
-            userId: '12346',
             keywords: ['a', 'b', 'c'],
             inventory: {
               rating: '5-star', // This actually should not be sent to frank!! causes 400
@@ -125,6 +124,7 @@ describe('the rubicon adapter', function () {
           sizes: [[300, 250], [320, 50]],
           bidId: '2ffb201a808da7',
           bidderRequestId: '178e34bad3658f',
+          userIdAsEids: [{source: 'test', uids: [{id: '12346'}]}],
           auctionId: 'c45dd708-a418-42ec-b8a7-b70a6c6fab0a',
           ortb2Imp: {
             ext: {
@@ -184,7 +184,6 @@ describe('the rubicon adapter', function () {
         accountId: '14062',
         siteId: '70608',
         zoneId: (i + 1).toString(),
-        userId: '12346',
         position: 'atf',
         referrer: 'localhost'
       },
@@ -193,6 +192,7 @@ describe('the rubicon adapter', function () {
       sizes: [size],
       bidId: i.toString(),
       bidderRequestId: i.toString(),
+      userIdAsEids: [{source: 'test', uids: [{id: '12346'}]}],
       auctionId: 'c45dd708-a418-42ec-b8a7-b70a6c6fab0a',
       transactionId: 'd45dd707-a418-42ec-b8a7-b70a6c6fab0b'
     };
@@ -417,7 +417,6 @@ describe('the rubicon adapter', function () {
             accountId: '14062',
             siteId: '70608',
             zoneId: '335918',
-            userId: '12346',
             keywords: ['a', 'b', 'c'],
             inventory: {
               rating: '5-star', // This actually should not be sent to frank!! causes 400
@@ -440,6 +439,7 @@ describe('the rubicon adapter', function () {
           sizes: [[300, 250], [320, 50]],
           bidId: '2ffb201a808da7',
           bidderRequestId: '178e34bad3658f',
+          userIdAsEids: [{source: 'test', uids: [{id: '12346'}]}],
           auctionId: 'c45dd708-a418-42ec-b8a7-b70a6c6fab0a',
           ortb2Imp: {
             ext: {
