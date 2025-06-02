@@ -48,4 +48,9 @@ exports.config = {
   maxInstances: 5, // Do not increase this, since we have only 5 parallel tests in browserstack account
   maxInstancesPerCapability: 1,
   capabilities: getCapabilities(),
+  onComplete: function(exitCode) {
+    if (exitCode !== 0) {
+      console.error('BrowserStack queue limit may have been exceeded. Look for "BROWSERSTACK_QUEUE_SIZE_EXCEEDED" above.');
+    }
+  }
 }
