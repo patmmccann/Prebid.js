@@ -148,9 +148,17 @@ function setEnvelopeSource(src) {
   storage.setCookie('_lr_env_src_ats', src, now.toUTCString());
 }
 
+function decodeEnvelope(encoded) {
+  try {
+    return window.atob(encoded.replace(/-/g, '+').replace(/_/g, '/'));
+  } catch (e) {
+    utils.logInfo(e);
+  }
+}
+
 export function getEnvelopeFromStorage() {
   let rawEnvelope = storage.getCookie(liverampEnvelopeName) || storage.getDataFromLocalStorage(liverampEnvelopeName);
-  return rawEnvelope ? window.atob(rawEnvelope) : undefined;
+  return rawEnvelope ? decodeEnvelope(rawEnvelope) : undefined;
 }
 
 submodule('userId', identityLinkSubmodule);
