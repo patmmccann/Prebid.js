@@ -1353,3 +1353,50 @@ describe('getWinDimensions', () => {
     sinon.assert.calledTwice(resetWinDimensionsSpy);
   });
 });
+
+  describe('scheduleBackgroundTask', () => {
+    let origScheduler;
+
+    beforeEach(() => {
+      origScheduler = window.scheduler;
+    });
+
+    afterEach(() => {
+      window.scheduler = origScheduler;
+    });
+
+    it('uses scheduler.postTask when available', () => {
+      const postTask = sinon.stub().callsFake((fn) => {
+        fn();
+        return Promise.resolve();
+      });
+      window.scheduler = {postTask};
+      const task = sinon.spy();
+
+      return utils.scheduleBackgroundTask(task).then(() => {
+        sinon.assert.calledOnce(postTask);
+        sinon.assert.calledWith(postTask, task, {priority: 'background'});
+        sinon.assert.calledOnce(task);
+      });
+    });
+
+    it('uses scheduler.yield when postTask unavailable', () => {
+      const yieldStub = sinon.stub().resolves();
+      window.scheduler = {yield: yieldStub};
+      const task = sinon.spy();
+
+      return utils.scheduleBackgroundTask(task).then(() => {
+        sinon.assert.calledOnce(yieldStub);
+        sinon.assert.calledOnce(task);
+      });
+    });
+
+  it('falls back to microtask when scheduler missing', () => {
+      delete window.scheduler;
+      const task = sinon.spy();
+
+      return utils.scheduleBackgroundTask(task).then(() => {
+        sinon.assert.calledOnce(task);
+      });
+    });
+  });

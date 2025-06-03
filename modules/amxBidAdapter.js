@@ -10,6 +10,7 @@ import {
   logError,
   parseUrl,
   triggerPixel,
+  scheduleBackgroundTask,
   generateUUID,
 } from '../src/utils.js';
 import { config } from '../src/config.js';
@@ -113,13 +114,15 @@ function createBidMap(bids) {
 }
 
 const trackEvent = (eventName, data) =>
-  triggerPixel(
-    `${TRACKING_ENDPOINT}g_${eventName}?${formatQS({
-      ...data,
-      ts: Date.now(),
-      eid: getUniqueIdentifierStr(),
-    })}`
-  );
+  scheduleBackgroundTask(() => {
+    triggerPixel(
+      `${TRACKING_ENDPOINT}g_${eventName}?${formatQS({
+        ...data,
+        ts: Date.now(),
+        eid: getUniqueIdentifierStr(),
+      })}`
+    );
+  });
 
 const DEFAULT_MIN_FLOOR = 0;
 

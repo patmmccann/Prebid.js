@@ -1,4 +1,4 @@
-import {deepSetValue, isFn, logWarn} from '../src/utils.js';
+import {deepSetValue, isFn, logWarn, scheduleBackgroundTask} from '../src/utils.js';
 import {registerBidder} from '../src/adapters/bidderFactory.js';
 import {BANNER} from '../src/mediaTypes.js';
 import {ortbConverter} from '../libraries/ortbConverter/converter.js';
@@ -38,16 +38,18 @@ function reportEvents(eventType, eventData) {
     eventPayload: eventData
   });
 
-  fetch(`${SERVER_PATH_US1_EVENTS}`, {
-    body: payload,
-    keepalive: true,
-    credentials: 'include',
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    }
-  }).catch((_e) => {
-    // ignore errors for now
+  scheduleBackgroundTask(() => {
+    fetch(`${SERVER_PATH_US1_EVENTS}`, {
+      body: payload,
+      keepalive: true,
+      credentials: 'include',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).catch((_e) => {
+      // ignore errors for now
+    });
   });
 }
 
