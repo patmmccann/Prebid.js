@@ -1327,6 +1327,43 @@ describe('memoize', () => {
   });
 })
 
+describe('scheduleBackgroundTask', () => {
+  let postTask, yieldStub, origScheduler;
+
+  beforeEach(() => {
+    origScheduler = window.scheduler;
+  });
+
+  afterEach(() => {
+    window.scheduler = origScheduler;
+  });
+
+  it('uses scheduler.postTask when available', async () => {
+    const fn = sinon.spy();
+    postTask = sinon.stub().resolves();
+    window.scheduler = {postTask};
+    await utils.scheduleBackgroundTask(fn);
+    sinon.assert.calledWith(postTask, fn, {priority: 'background'});
+    sinon.assert.calledOnce(fn);
+  });
+
+  it('falls back to scheduler.yield', async () => {
+    const fn = sinon.spy();
+    yieldStub = sinon.stub().resolves();
+    window.scheduler = {yield: yieldStub};
+    await utils.scheduleBackgroundTask(fn);
+    sinon.assert.calledOnce(yieldStub);
+    sinon.assert.calledOnce(fn);
+  });
+
+  it('uses microtask when scheduler unavailable', async () => {
+    const fn = sinon.spy();
+    window.scheduler = undefined;
+    await utils.scheduleBackgroundTask(fn);
+    sinon.assert.calledOnce(fn);
+  });
+});
+
 describe('getWinDimensions', () => {
   let clock;
 

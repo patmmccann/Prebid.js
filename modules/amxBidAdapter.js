@@ -10,6 +10,7 @@ import {
   logError,
   parseUrl,
   triggerPixel,
+  scheduleBackgroundTask,
   generateUUID,
   scheduleBackgroundTask,
 } from '../src/utils.js';
@@ -88,8 +89,8 @@ function getUIDSafe() {
   }
 }
 
-function setUIDSafe(uid) {
-  try {
+  scheduleBackgroundTask(() => triggerPixel(
+  ));
     storage.setDataInLocalStorage(AMUID_KEY, uid);
   } catch (e) {
     // do nothing
@@ -546,8 +547,8 @@ export const spec = {
           : {};
 
       if (common == null) {
-        common = {
-          do: domain,
+    scheduleBackgroundTask(() => fetch(POST_TRACKING_ENDPOINT, {
+    }));
           u: page,
           U: getUIDSafe(),
           re: ref,

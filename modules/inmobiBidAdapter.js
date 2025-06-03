@@ -1,4 +1,4 @@
-import { deepAccess, deepSetValue, isFn } from '../src/utils.js';
+import { deepAccess, deepSetValue, isFn, scheduleBackgroundTask } from '../src/utils.js';
 import { registerBidder } from '../src/adapters/bidderFactory.js';
 import { BANNER, NATIVE, VIDEO } from '../src/mediaTypes.js';
 import { ortbConverter } from '../libraries/ortbConverter/converter.js';
@@ -331,7 +331,7 @@ function report(type, data) {
     eventPayload: data
   });
 
-  fetch(`${EVENT_ENDPOINT}/report/${type}`, {
+  scheduleBackgroundTask(() => fetch(`${EVENT_ENDPOINT}/report/${type}`, {
     body: payload,
     keepalive: true,
     credentials: 'include',
@@ -341,7 +341,7 @@ function report(type, data) {
     }
   }).catch((_e) => {
     // do nothing; ignore errors
-  });
+  }));
 }
 
 registerBidder(spec);
