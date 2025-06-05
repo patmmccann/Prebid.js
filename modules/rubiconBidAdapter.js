@@ -504,7 +504,7 @@ export const spec = {
       'ip': bidRequest.ortb2?.device?.ip,
       'ipv6': bidRequest.ortb2?.device?.ipv6,
       'p_screen_res': _getScreenResolution(),
-      'tk_user_key': params.userId,
+      'tk_user_key': _getTkUserKeyFromEids(bidRequest),
       'p_geo.latitude': isNaN(parseFloat(latitude)) ? undefined : parseFloat(latitude).toFixed(4),
       'p_geo.longitude': isNaN(parseFloat(longitude)) ? undefined : parseFloat(longitude).toFixed(4),
       'tg_fl.eid': bidRequest.code,
@@ -799,6 +799,23 @@ function _getPageUrl(bidRequest, bidderRequest) {
     pageUrl = bidderRequest.refererInfo.page;
   }
   return bidRequest.params.secure ? pageUrl.replace(/^http:/i, 'https:') : pageUrl;
+}
+
+/**
+ * Extract tk_user_key from userIdAsEids if available
+ * @param {BidRequest} bidRequest
+ * @returns {string|undefined}
+ */
+function _getTkUserKeyFromEids(bidRequest) {
+  const eids = bidRequest.userIdsAsEids || bidRequest.userIdAsEids;
+  if (Array.isArray(eids)) {
+    for (let i = 0; i < eids.length; i++) {
+      const uid = eids[i] && eids[i].uids && eids[i].uids[0];
+      if (uid && uid.id) {
+        return uid.id;
+      }
+    }
+  }
 }
 
 function _renderCreative(script, impId) {
