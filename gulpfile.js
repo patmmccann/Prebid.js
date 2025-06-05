@@ -16,7 +16,6 @@ const standaloneDebuggingConfig = require('./webpack.debugging.js');
 var helpers = require('./gulpHelpers.js');
 var concat = require('gulp-concat');
 var replace = require('gulp-replace');
-var shell = require('gulp-shell');
 var gulpif = require('gulp-if');
 var through = require('through2');
 var fs = require('fs');
@@ -75,7 +74,8 @@ function escapePostbidConfig() {
 };
 escapePostbidConfig.displayName = 'escape-postbid-config';
 
-function lint(done) {
+// lint task updated by Codex bot
+async function lint(done) {
   if (argv.nolint) {
     return done();
   }
@@ -86,11 +86,13 @@ function lint(done) {
   if (!(typeof argv.lintWarnings === 'boolean' ? argv.lintWarnings : true)) {
     args.push('--quiet')
   }
-  return shell.task(args.join(' '))().then(() => {
+  try {
+    const {exec} = await import('gulp-execa');
+    await exec(args.join(' '), {shell: true});
     done();
-  }, (err) => {
+  } catch (err) {
     done(err);
-  });
+  }
 };
 
 // View the code coverage report in the browser.
@@ -447,11 +449,10 @@ function testCoverage(done) {
   }, done);
 }
 
-function coveralls() { // 2nd arg is a dependency: 'test' must be finished
+async function coveralls() { // 2nd arg is a dependency: 'test' must be finished
   // first send results of istanbul's test coverage to coveralls.io.
-  return gulp.src('gulpfile.js', { read: false }) // You have to give it a file, but you don't
-    // have to read it.
-    .pipe(shell('cat build/coverage/lcov.info | node_modules/coveralls/bin/coveralls.js'));
+  const {exec} = await import('gulp-execa');
+  await exec('cat build/coverage/lcov.info | node_modules/coveralls/bin/coveralls.js', {shell: true});
 }
 
 // This task creates postbid.js. Postbid setup is different from prebid.js
@@ -552,7 +553,10 @@ gulp.task(viewCoverage);
 gulp.task('coveralls', gulp.series('test-coverage', coveralls));
 
 // npm will by default use .gitignore, so create an .npmignore that is a copy of it except it includes "dist"
-gulp.task('setup-npmignore', shell.task("sed 's/^\\/\\?dist\\/\\?$//g;w .npmignore' .gitignore", {quiet: true}));
+gulp.task('setup-npmignore', async function setupNpmignore() {
+  const {exec} = await import('gulp-execa');
+  await exec("sed 's/^\\/\\?dist\\/\\?$//g;w .npmignore' .gitignore", {shell: true});
+});
 gulp.task('build', gulp.series(clean, 'build-bundle-prod', updateCreativeExample, setupDist));
 gulp.task('build-release', gulp.series('build', 'setup-npmignore'));
 gulp.task('build-postbid', gulp.series(escapePostbidConfig, buildPostbid));
