@@ -29,6 +29,9 @@ import {BID_STATUS, EVENTS, GRANULARITY_OPTIONS, PB_LOCATOR, TARGETING_KEYS} fro
 import {getBidToRender} from '../../../src/adRendering.js';
 import {setBattrForAdUnit} from '../../../src/prebid.js';
 
+// ensure hooks are initialized before additional modules are loaded
+hook.ready();
+
 var assert = require('chai').assert;
 var expect = require('chai').expect;
 
