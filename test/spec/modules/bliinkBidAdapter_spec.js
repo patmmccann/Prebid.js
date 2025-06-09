@@ -40,6 +40,7 @@ import { config } from 'src/config.js';
 const w = (canAccessWindowTop()) ? getWindowTop() : getWindowSelf();
 const connectionType = getEffectiveConnectionType();
 const domLoadingDuration = getDomLoadingDuration(w).toString();
+const expectedDomLoadingDuration = (parseInt(domLoadingDuration) > -1) ? { domLoadingDuration } : {};
 const getConfigBid = (placement) => {
   return {
     adUnitCode: '/19968336/test',
@@ -685,7 +686,7 @@ const testsBuildRequests = [
       method: 'POST',
       url: BLIINK_ENDPOINT_ENGINE,
       data: {
-        domLoadingDuration,
+        ...expectedDomLoadingDuration,
         ect: connectionType,
         keywords: '',
         pageDescription: '',
@@ -728,7 +729,7 @@ const testsBuildRequests = [
       method: 'POST',
       url: BLIINK_ENDPOINT_ENGINE,
       data: {
-        domLoadingDuration,
+        ...expectedDomLoadingDuration,
         ect: connectionType,
         gdpr: true,
         gdprConsent: 'XXXX',
@@ -774,7 +775,7 @@ const testsBuildRequests = [
       method: 'POST',
       url: BLIINK_ENDPOINT_ENGINE,
       data: {
-        domLoadingDuration,
+        ...expectedDomLoadingDuration,
         ect: connectionType,
         gdpr: true,
         uspConsent: 'uspConsent',
@@ -834,7 +835,7 @@ const testsBuildRequests = [
       method: 'POST',
       url: BLIINK_ENDPOINT_ENGINE,
       data: {
-        domLoadingDuration,
+        ...expectedDomLoadingDuration,
         ect: connectionType,
         gdpr: true,
         gdprConsent: 'XXXX',
@@ -913,7 +914,7 @@ const testsBuildRequests = [
       method: 'POST',
       url: BLIINK_ENDPOINT_ENGINE,
       data: {
-        domLoadingDuration,
+        ...expectedDomLoadingDuration,
         ect: connectionType,
         gdpr: true,
         gdprConsent: 'XXXX',
@@ -1129,7 +1130,7 @@ describe('BLIINK Adapter keywords & coppa true', function () {
       method: 'POST',
       url: BLIINK_ENDPOINT_ENGINE,
       data: {
-        domLoadingDuration,
+        ...expectedDomLoadingDuration,
         ect: connectionType,
         gdpr: true,
         coppa: 1,
