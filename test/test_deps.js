@@ -28,6 +28,8 @@ window.addEventListener('unhandledrejection', function (ev) {
 })
 
 const sinon = require('sinon');
+// patched by Codex bot to ensure sinon is globally available for Safari tests
+globalThis.sinon = sinon;
 if (!sinon.sandbox) {
   sinon.sandbox = {create: sinon.createSandbox.bind(sinon)};
 }
