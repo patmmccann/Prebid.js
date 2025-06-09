@@ -7,6 +7,7 @@ import { userSync } from '../src/userSync.js';
 import { bidderSettings } from '../src/bidderSettings.js';
 import { getAllOrtbKeywords } from '../libraries/keywords/keywords.js';
 import { getGptSlotInfoForAdUnitCode } from '../libraries/gptUtils/gptUtils.js';
+import { getStorageManager } from '../src/storageManager.js';
 
 /**
  * @typedef {import('../src/adapters/bidderFactory.js').BidRequest} BidRequest
@@ -17,6 +18,7 @@ const BIDDER_CODE = 'sonobi';
 const STR_ENDPOINT = 'https://apex.go.sonobi.com/trinity.json';
 const PAGEVIEW_ID = generateUUID();
 const OUTSTREAM_REDNERER_URL = 'https://mtrx.go.sonobi.com/sbi_outstream_renderer.js';
+const storage = getStorageManager({bidderCode: BIDDER_CODE});
 
 export const spec = {
   code: BIDDER_CODE,
@@ -470,17 +472,14 @@ function loadOrCreateFirstPartyData() {
       return null;
     }
   };
+  var hasLocalStorage = function () {
+    return storage.hasLocalStorage() && storage.localStorageIsEnabled();
+  };
   var readData = function (key) {
     if (hasLocalStorage()) {
-      // TODO FIX RULES VIOLATION
-      // eslint-disable-next-line no-restricted-properties
-      return window.localStorage.getItem(key);
+      return storage.getDataFromLocalStorage(key);
     }
     return null;
-  };
-  // TODO FIX RULES VIOLATION - USE STORAGE MANAGER
-  var hasLocalStorage = function () {
-    return false;
   };
   var generateGUID = function () {
     var d = new Date().getTime();
@@ -493,9 +492,7 @@ function loadOrCreateFirstPartyData() {
   var storeData = function (key, value) {
     try {
       if (hasLocalStorage()) {
-        // TODO FIX RULES VIOLATION
-        // eslint-disable-next-line no-restricted-properties
-        window.localStorage.setItem(key, value);
+        storage.setDataInLocalStorage(key, value);
       }
     } catch (error) {
       return null;
