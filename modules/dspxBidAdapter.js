@@ -178,7 +178,6 @@ export const spec = {
 
 /**
  * Outstream Render Function
- *
  * @param bid
  */
 function outstreamRender(bid) {
@@ -216,7 +215,6 @@ function outstreamRender(bid) {
 
 /**
  * create Outstream Embed Code Node
- *
  * @param bid
  * @returns {DocumentFragment}
  */
@@ -248,7 +246,6 @@ function createOutstreamEmbedCode(bid) {
 
 /**
  * Create a new renderer
- *
  * @param bidRequest
  * @param response
  * @returns {Renderer}
