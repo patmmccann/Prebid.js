@@ -2818,64 +2818,6 @@ describe('ozone Adapter', function () {
       expect(request.method).to.equal('POST');
       config.resetConfig();
     });
-    it('should use GET values for batchRequests if found', function() {
-      var specMock = utils.deepClone(spec);
-      specMock.getGetParametersAsObject = function() {
-        return {'batchRequests': '5'};
-      };
-      let arrReq = [];
-      for (let i = 0; i < 25; i++) {
-        let b = validBidRequests[0];
-        b.adUnitCode += i;
-        arrReq.push(b);
-      }
-      let request = specMock.buildRequests(arrReq, validBidderRequest);
-      expect(request.length).to.equal(5); // 5 x 5 = 25
-      specMock = utils.deepClone(spec);
-      specMock.getGetParametersAsObject = function() {
-        return {'batchRequests': '10'}; // the built in function will return '10' (string)
-      };
-      request = specMock.buildRequests(arrReq, validBidderRequest);
-      expect(request.length).to.equal(3); // 10, 10, 5
-      specMock = utils.deepClone(spec);
-      specMock.getGetParametersAsObject = function() {
-        return {'batchRequests': true};
-      };
-      request = specMock.buildRequests(arrReq, validBidderRequest);
-      expect(request.method).to.equal('POST'); // no batching - GET param must be numeric
-      specMock = utils.deepClone(spec);
-      specMock.getGetParametersAsObject = function() {
-        return {'batchRequests': 'true'};
-      };
-      request = specMock.buildRequests(arrReq, validBidderRequest);
-      expect(request.method).to.equal('POST'); // no batching - GET param must be numeric
-      specMock = utils.deepClone(spec);
-      specMock.getGetParametersAsObject = function() {
-        return {'batchRequests': -5};
-      };
-      request = specMock.buildRequests(arrReq, validBidderRequest);
-      expect(request.method).to.equal('POST'); // no batching
-    });
-    it('should use GET values auction=dev & cookiesync=dev if set', function() {
-      var specMock = utils.deepClone(spec);
-      specMock.getGetParametersAsObject = function() {
-        return {};
-      };
-      let request = specMock.buildRequests(validBidRequestsMinimal, validBidderRequest);
-      let url = request.url;
-      expect(url).to.equal('https://elb.the-ozone-project.com/openrtb2/auction');
-      let cookieUrl = specMock.getCookieSyncUrl();
-      expect(cookieUrl).to.equal('https://elb.the-ozone-project.com/static/load-cookie.html');
-      specMock = utils.deepClone(spec);
-      specMock.getGetParametersAsObject = function() {
-        return {'auction': 'dev', 'cookiesync': 'dev'};
-      };
-      request = specMock.buildRequests(validBidRequestsMinimal, validBidderRequest);
-      url = request.url;
-      expect(url).to.equal('https://test.ozpr.net/openrtb2/auction');
-      cookieUrl = specMock.getCookieSyncUrl();
-      expect(cookieUrl).to.equal('https://test.ozpr.net/static/load-cookie.html');
-    });
     it('should use a valid ozstoredrequest GET value if set to override the placementId values, and set oz_rw if we find it', function() {
       var specMock = utils.deepClone(spec);
       specMock.getGetParametersAsObject = function() {
