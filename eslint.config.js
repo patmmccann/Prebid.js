@@ -106,7 +106,7 @@ function commonConfig(overrides) {
       'jsdoc/require-yields': 'off',
       'jsdoc/require-yields-check': 'off',
       'jsdoc/tag-lines': 'off',
-      'no-var': 'off',
+      'no-var': 'error',
       'no-empty': 'off',
       'no-void': 'off',
       'array-callback-return': 'off',
@@ -130,7 +130,7 @@ function commonConfig(overrides) {
       '@stylistic/comma-dangle': 'off',
       '@stylistic/object-curly-newline': 'off',
       '@stylistic/object-property-newline': 'off',
-      '@stylistic/no-multiple-empty-lines': 'off',
+      '@stylistic/no-multiple-empty-lines': 'error',
 
     }
   }, overrides);
