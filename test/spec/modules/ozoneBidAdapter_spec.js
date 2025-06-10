@@ -1,8 +1,7 @@
 import { expect } from 'chai';
-import { spec, getWidthAndHeightFromVideoObject, playerSizeIsNestedArray, defaultSize } from 'modules/ozoneBidAdapter.js';
+import { spec, getWidthAndHeightFromVideoObject, defaultSize } from 'modules/ozoneBidAdapter.js';
 import { config } from 'src/config.js';
 import {Renderer} from '../../../src/Renderer.js';
-import {getGranularityKeyName, getGranularityObject} from '../../../modules/ozoneBidAdapter.js';
 import * as utils from '../../../src/utils.js';
 import {deepSetValue} from '../../../src/utils.js';
 const OZONEURI = 'https://elb.the-ozone-project.com/openrtb2/auction';
@@ -2695,7 +2694,6 @@ describe('ozone Adapter', function () {
       expect(payload.user.ext.eids[6]['uids'][0]['id']['eid']).to.equal('01.5678.parrableid');
     });
     it('replaces the auction url for a config override', function () {
-      spec.propertyBag.whitelabel = null;
       let fakeOrigin = 'http://sometestendpoint';
       config.setConfig({'ozone': {'endpointOverride': {'origin': fakeOrigin}}});
       const request = spec.buildRequests(validBidRequests, validBidderRequest);
@@ -2704,10 +2702,8 @@ describe('ozone Adapter', function () {
       const data = JSON.parse(request.data);
       expect(data.ext.ozone.origin).to.equal(fakeOrigin);
       config.setConfig({'ozone': {'kvpPrefix': null, 'endpointOverride': null}});
-      spec.propertyBag.whitelabel = null;
     });
     it('replaces the FULL auction url for a config override', function () {
-      spec.propertyBag.whitelabel = null;
       let fakeurl = 'http://sometestendpoint/myfullurl';
       config.setConfig({'ozone': {'endpointOverride': {'auctionUrl': fakeurl}}});
       const request = spec.buildRequests(validBidRequests, validBidderRequest);
@@ -2716,10 +2712,8 @@ describe('ozone Adapter', function () {
       const data = JSON.parse(request.data);
       expect(data.ext.ozone.origin).to.equal(fakeurl);
       config.setConfig({'ozone': {'kvpPrefix': null, 'endpointOverride': null}});
-      spec.propertyBag.whitelabel = null;
     });
     it('replaces the renderer url for a config override', function () {
-      spec.propertyBag.whitelabel = null;
       let fakeUrl = 'http://renderer.com';
       config.setConfig({'ozone': {'endpointOverride': {'rendererUrl': fakeUrl}}});
       const request = spec.buildRequests(validBidRequests1OutstreamVideo2020, validBidderRequest1OutstreamVideo2020.bidderRequest);
@@ -2728,45 +2722,12 @@ describe('ozone Adapter', function () {
       expect(bid.renderer).to.be.an.instanceOf(Renderer);
       expect(bid.renderer.url).to.equal(fakeUrl);
       config.setConfig({'ozone': {'kvpPrefix': null, 'endpointOverride': null}});
-      spec.propertyBag.whitelabel = null;
-    });
-    it('should generate all the adservertargeting keys correctly named', function () {
-      config.setConfig({'ozone': {'kvpPrefix': 'xx'}});
-      const request = spec.buildRequests(validBidRequests, validBidderRequest);
-      const result = spec.interpretResponse(validResponse, request);
-      expect(result[0].adserverTargeting).to.have.own.property('xx_appnexus_crid');
-      expect(utils.deepAccess(result[0].adserverTargeting, 'xx_appnexus_crid')).to.equal('98493581');
-      expect(utils.deepAccess(result[0].adserverTargeting, 'xx_pb')).to.equal(0.5);
-      expect(utils.deepAccess(result[0].adserverTargeting, 'xx_adId')).to.equal('2899ec066a91ff8-0-xx-0');
-      expect(utils.deepAccess(result[0].adserverTargeting, 'xx_size')).to.equal('300x600');
-      expect(utils.deepAccess(result[0].adserverTargeting, 'xx_pb_r')).to.equal('0.50');
-      expect(utils.deepAccess(result[0].adserverTargeting, 'xx_bid')).to.equal('true');
     });
     it('should create a meta object on each bid returned', function () {
       const request = spec.buildRequests(validBidRequests, validBidderRequest);
       const result = spec.interpretResponse(validResponse, request);
       expect(result[0]).to.have.own.property('meta');
       expect(result[0].meta.advertiserDomains[0]).to.equal('http://prebid.org');
-    });
-    it('replaces the kvp prefix ', function () {
-      spec.propertyBag.whitelabel = null;
-      config.setConfig({'ozone': {'kvpPrefix': 'test'}});
-      const request = spec.buildRequests(validBidRequests, validBidderRequest);
-      const data = JSON.parse(request.data);
-      expect(data.ext.ozone).to.haveOwnProperty('test_rw');
-      config.resetConfig();
-      spec.propertyBag.whitelabel = null;
-    });
-    it('handles an alias ', function () {
-      spec.propertyBag.whitelabel = null;
-      config.setConfig({'venatus': {'kvpPrefix': 've'}});
-      let br = JSON.parse(JSON.stringify(validBidRequests));
-      br[0]['bidder'] = 'venatus';
-      const request = spec.buildRequests(br, validBidderRequest);
-      const data = JSON.parse(request.data);
-      expect(data.ext.venatus).to.haveOwnProperty('ve_rw');
-      config.resetConfig();
-      spec.propertyBag.whitelabel = null;
     });
     it('should use oztestmode GET value if set', function() {
       var specMock = utils.deepClone(spec);
@@ -3180,9 +3141,7 @@ describe('ozone Adapter', function () {
     });
     it('Single request: should use ortb auction ID & transaction ID values if set (this will be the case when publisher opts in with config)', function() {
       var specMock = utils.deepClone(spec);
-      specMock.propertyBag.whitelabel = null;
       config.setConfig({'ozone': {'singleRequest': true}});
-      specMock.loadWhitelabelData(validBidRequestsWithAuctionIdTransactionId[0]);
       const request = specMock.buildRequests(validBidRequestsWithAuctionIdTransactionId, validBidderRequest); // I don't look in the bidderRequest for this - there's no point
       expect(request).to.be.an('Object');
       const payload = JSON.parse(request.data);
@@ -3193,9 +3152,7 @@ describe('ozone Adapter', function () {
     });
     it('non-Single request: should use ortb auction ID & transaction ID values if set (this will be the case when publisher opts in with config)', function() {
       var specMock = utils.deepClone(spec);
-      specMock.propertyBag.whitelabel = null;
       config.setConfig({'ozone': {'singleRequest': false}});
-      specMock.loadWhitelabelData(validBidRequestsWithAuctionIdTransactionId[0]);
       const request = specMock.buildRequests(validBidRequestsWithAuctionIdTransactionId, validBidderRequest); // I don't look in the bidderRequest for this - there's no point
       expect(request).to.be.an('Array');
       const payload = JSON.parse(request[0].data);
@@ -3206,9 +3163,7 @@ describe('ozone Adapter', function () {
     });
     it('Batch request (flat array of single requests): should use ortb auction ID & transaction ID values if set (this will be the case when publisher opts in with config)', function() {
       var specMock = utils.deepClone(spec);
-      specMock.propertyBag.whitelabel = null;
       config.setConfig({'ozone': {'batchRequests': 3}});
-      specMock.loadWhitelabelData(valid6BidRequestsWithAuctionIdTransactionId[0]);
       const request = specMock.buildRequests(valid6BidRequestsWithAuctionIdTransactionId, validBidderRequest); // I don't look in the bidderRequest for this - there's no point
       expect(request).to.be.an('Array');
       expect(request).to.have.lengthOf(2);
@@ -3333,14 +3288,6 @@ describe('ozone Adapter', function () {
       expect(utils.deepAccess(result[0].adserverTargeting, 'oz_appnexus_omp')).to.be.undefined;
     });
     it('should handle ext.bidder.ozone.floor correctly, setting flr & rid as necessary', function () {
-      const request = spec.buildRequests(validBidRequests, validBidderRequest);
-      let vres = JSON.parse(JSON.stringify(validResponse));
-      vres.body.seatbid[0].bid[0].ext.bidder.ozone = {floor: 1, ruleId: 'ZjbsYE1q'};
-      const result = spec.interpretResponse(vres, request);
-      expect(utils.deepAccess(result[0].adserverTargeting, 'oz_appnexus_flr')).to.equal(1);
-      expect(utils.deepAccess(result[0].adserverTargeting, 'oz_appnexus_rid')).to.equal('ZjbsYE1q');
-    });
-    it('Alias venatus: should handle ext.bidder.venatus.floor correctly, setting flr & rid as necessary', function () {
       const request = spec.buildRequests(validBidRequests, validBidderRequest);
       let vres = JSON.parse(JSON.stringify(validResponse));
       vres.body.seatbid[0].bid[0].ext.bidder.ozone = {floor: 1, ruleId: 'ZjbsYE1q'};
@@ -3588,26 +3535,6 @@ describe('ozone Adapter', function () {
       const result = getWidthAndHeightFromVideoObject(obj);
       expect(result).to.be.null;
     });
-    it('should find that player size is nested', function () {
-      let obj = {'playerSize': [[640, 480]], 'mimes': ['video/mp4'], 'context': 'outstream'};
-      const result = playerSizeIsNestedArray(obj);
-      expect(result).to.be.true;
-    });
-    it('should find null from bad video object', function () {
-      let obj = {'playerSize': [], 'mimes': ['video/mp4'], 'context': 'outstream'};
-      const result = playerSizeIsNestedArray(obj);
-      expect(result).to.be.null;
-    });
-    it('should find null from bad video object2', function () {
-      let obj = {'mimes': ['video/mp4'], 'context': 'outstream'};
-      const result = playerSizeIsNestedArray(obj);
-      expect(result).to.be.null;
-    });
-    it('should find null from bad video object3', function () {
-      let obj = {'playerSize': 'should be an array', 'mimes': ['video/mp4'], 'context': 'outstream'};
-      const result = playerSizeIsNestedArray(obj);
-      expect(result).to.be.null;
-    });
     it('should add oz_appnexus_dealid into ads request if dealid exists in the auction response', function () {
       const request = spec.buildRequests(validBidRequestsMulti, validBidderRequest);
       let validres = JSON.parse(JSON.stringify(validResponse2Bids));
@@ -3623,30 +3550,6 @@ describe('ozone Adapter', function () {
       const result = defaultSize(obj);
       expect(result.defaultHeight).to.equal(250);
       expect(result.defaultWidth).to.equal(300);
-    });
-  });
-  describe('getGranularityKeyName', function() {
-    it('should return a string granularity as-is', function() {
-      const result = getGranularityKeyName('', 'this is it', '');
-      expect(result).to.equal('this is it');
-    });
-    it('should return "custom" for a mediaTypeGranularity object', function() {
-      const result = getGranularityKeyName('', {}, '');
-      expect(result).to.equal('custom');
-    });
-    it('should return "custom" for a mediaTypeGranularity object', function() {
-      const result = getGranularityKeyName('', false, 'string buckets');
-      expect(result).to.equal('string buckets');
-    });
-  });
-  describe('getGranularityObject', function() {
-    it('should return an object as-is', function() {
-      const result = getGranularityObject('', {'name': 'mark'}, '', '');
-      expect(result.name).to.equal('mark');
-    });
-    it('should return an object as-is', function() {
-      const result = getGranularityObject('', false, 'custom', {'name': 'rupert'});
-      expect(result.name).to.equal('rupert');
     });
   });
   describe('blockTheRequest', function() {
@@ -3736,7 +3639,7 @@ describe('ozone Adapter', function () {
     });
     it('should correctly add video defaults if page config videoParams is defined, also check skip in the parent', function () {
       var specMock = utils.deepClone(spec);
-      specMock.propertyBag.whitelabel.videoParams = {outstream: 3, instream: 1};
+      config.setConfig({'ozone': {videoParams: {outstream: 3, instream: 1}}});
       let mediaTypes = {
         playerSize: [640, 480],
         mimes: ['video/mp4'],
@@ -3755,6 +3658,7 @@ describe('ozone Adapter', function () {
       let result = specMock.addVideoDefaults({}, mediaTypes, bid_params_video);
       expect(result.placement).to.equal(3);
       expect(result.skip).to.equal(1);
+      config.resetConfig();
     });
   });
   describe('removeSingleBidderMultipleBids', function() {
@@ -3767,28 +3671,6 @@ describe('ozone Adapter', function () {
       expect(response[0].bid.length).to.equal(2);
       expect(response[0].seat).to.equal('ozappnexus');
       expect(response[1].bid.length).to.equal(2);
-    });
-  });
-  describe('getWhitelabelConfigItem', function() {
-    beforeEach(function () {
-      config.resetConfig()
-    })
-    it('should fetch the whitelabelled equivalent config value correctly', function () {
-      var specMock = utils.deepClone(spec);
-      config.setConfig({'ozone': {'oz_omp_floor': 'ozone-floor-value'}});
-      config.setConfig({'markbidder': {'mb_omp_floor': 'markbidder-floor-value'}});
-      specMock.propertyBag.whitelabel = {bidder: 'ozone', keyPrefix: 'oz'};
-      let testKey = 'ozone.oz_omp_floor';
-      let ozone_value = specMock.getWhitelabelConfigItem(testKey);
-      expect(ozone_value).to.equal('ozone-floor-value');
-      specMock.propertyBag.whitelabel = {bidder: 'markbidder', keyPrefix: 'mb'};
-      let markbidder_config = specMock.getWhitelabelConfigItem(testKey);
-      expect(markbidder_config).to.equal('markbidder-floor-value');
-      config.setConfig({'markbidder': {'singleRequest': 'markbidder-singlerequest-value'}});
-      let testKey2 = 'ozone.singleRequest';
-      let markbidder_config2 = specMock.getWhitelabelConfigItem(testKey2);
-      expect(markbidder_config2).to.equal('markbidder-singlerequest-value');
-      config.resetConfig();
     });
   });
   describe('setBidMediaTypeIfNotExist', function() {

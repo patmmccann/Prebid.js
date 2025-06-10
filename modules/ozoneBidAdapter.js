@@ -5,7 +5,6 @@ import {
   logWarn,
   deepSetValue,
   isArray,
-  contains,
   mergeDeep,
   parseUrl,
   generateUUID, isInteger, deepClone, getBidIdParameter
@@ -16,122 +15,55 @@ import {config} from '../src/config.js';
 import {getPriceBucketString} from '../src/cpmBucketManager.js';
 import { Renderer } from '../src/Renderer.js';
 import {getRefererInfo} from '../src/refererDetection.js';
+import {toOrtb25} from '../libraries/ortb2.5Translator/translator.js';
+
+const DEBUG = false;
+const info = (...args) => { if (DEBUG) logInfo(...args); };
 const BIDDER_CODE = 'ozone';
 const ORIGIN = 'https://elb.the-ozone-project.com'; // applies only to auction & cookie
 const AUCTIONURI = '/openrtb2/auction';
 const OZONECOOKIESYNC = '/static/load-cookie.html';
 const OZONE_RENDERER_URL = 'https://prebid.the-ozone-project.com/ozone-renderer.js';
-const ORIGIN_DEV = 'https://test.ozpr.net';
+const KEY_PREFIX = 'oz';
 const OZONEVERSION = '3.0.0';
 export const spec = {
   gvlid: 524,
-  aliases: [{code: 'venatus', gvlid: 524}],
   version: OZONEVERSION,
   code: BIDDER_CODE,
   supportedMediaTypes: [VIDEO, BANNER],
-  cookieSyncBag: {publisherId: null, siteId: null, userIdObject: {}}, // variables we want to make available to cookie sync
-  propertyBag: {pageId: null, buildRequestsStart: 0, buildRequestsEnd: 0, endpointOverride: null}, /* allow us to store vars in instance scope - needs to be an object to be mutable */
-  whitelabel_defaults: {
-    'logId': 'OZONE',
-    'bidder': 'ozone',
-    'keyPrefix': 'oz',
-    'auctionUrl': ORIGIN + AUCTIONURI,
-    'cookieSyncUrl': ORIGIN + OZONECOOKIESYNC,
-    'rendererUrl': OZONE_RENDERER_URL,
-    'batchRequests': false /* you can change this to true OR numeric OR override it in the config: config.ozone.batchRequests = true/false/number */
-  },
-  loadWhitelabelData(bid) {
-    if (this.propertyBag.whitelabel) { return; }
-    this.propertyBag.whitelabel = JSON.parse(JSON.stringify(this.whitelabel_defaults));
-    let bidder = bid.bidder || 'ozone'; // eg. ozone
-    this.propertyBag.whitelabel.logId = bidder.toUpperCase();
-    this.propertyBag.whitelabel.bidder = bidder;
-    let bidderConfig = config.getConfig(bidder) || {};
-    logInfo('got bidderConfig: ', deepClone(bidderConfig));
-    if (bidderConfig.kvpPrefix) {
-      this.propertyBag.whitelabel.keyPrefix = bidderConfig.kvpPrefix;
-    }
-    let arr = this.getGetParametersAsObject();
-    if (bidderConfig.endpointOverride) {
-      if (bidderConfig.endpointOverride.origin) {
-        this.propertyBag.endpointOverride = bidderConfig.endpointOverride.origin;
-        this.propertyBag.whitelabel.auctionUrl = bidderConfig.endpointOverride.origin + AUCTIONURI;
-        this.propertyBag.whitelabel.cookieSyncUrl = bidderConfig.endpointOverride.origin + OZONECOOKIESYNC;
-      }
-      if (arr.hasOwnProperty('renderer')) {
-        if (arr.renderer.match('%3A%2F%2F')) {
-          this.propertyBag.whitelabel.rendererUrl = decodeURIComponent(arr['renderer']);
-        } else {
-          this.propertyBag.whitelabel.rendererUrl = arr['renderer'];
-        }
-      } else if (bidderConfig.endpointOverride.rendererUrl) {
-        this.propertyBag.whitelabel.rendererUrl = bidderConfig.endpointOverride.rendererUrl;
-      }
-      if (bidderConfig.endpointOverride.cookieSyncUrl) {
-        this.propertyBag.whitelabel.cookieSyncUrl = bidderConfig.endpointOverride.cookieSyncUrl;
-      }
-      if (bidderConfig.endpointOverride.auctionUrl) {
-        this.propertyBag.endpointOverride = bidderConfig.endpointOverride.auctionUrl;
-        this.propertyBag.whitelabel.auctionUrl = bidderConfig.endpointOverride.auctionUrl;
-      }
-    }
-    if (bidderConfig.hasOwnProperty('batchRequests')) {
-      if (this.batchValueIsValid(bidderConfig.batchRequests)) {
-        this.propertyBag.whitelabel.batchRequests = bidderConfig.batchRequests;
-      } else {
-        logError('invalid config: batchRequest');
-      }
-    }
-    if (bidderConfig.hasOwnProperty('videoParams')) {
-      this.propertyBag.whitelabel.videoParams = bidderConfig.videoParams;
-    }
-    if (arr.hasOwnProperty('batchRequests')) {
-      let getBatch = parseInt(arr.batchRequests);
-      if (this.batchValueIsValid(getBatch)) {
-        this.propertyBag.whitelabel.batchRequests = getBatch;
-      } else {
-        logError('invalid GET: batchRequests');
-      }
-    }
-    try {
-      if (arr.hasOwnProperty('auction') && arr.auction === 'dev') {
-        logInfo('GET: auction=dev');
-        this.propertyBag.whitelabel.auctionUrl = ORIGIN_DEV + AUCTIONURI;
-      }
-      if (arr.hasOwnProperty('cookiesync') && arr.cookiesync === 'dev') {
-        logInfo('GET: cookiesync=dev');
-        this.propertyBag.whitelabel.cookieSyncUrl = ORIGIN_DEV + OZONECOOKIESYNC;
-      }
-    } catch (e) {}
-    logInfo('whitelabel: ', this.propertyBag.whitelabel);
-  },
-  batchValueIsValid(batch) {
-    return typeof batch === 'boolean' || (typeof batch === 'number' && batch > 0);
-  },
+  cookieSyncBag: {publisherId: null, siteId: null, userIdObject: {}},
+  propertyBag: {pageId: null, buildRequestsStart: 0, buildRequestsEnd: 0},
   getAuctionUrl() {
-    return this.propertyBag.whitelabel.auctionUrl;
+    const ep = config.getConfig('ozone.endpointOverride') || {};
+    if (ep.auctionUrl) return ep.auctionUrl;
+    const origin = ep.origin || ORIGIN;
+    return origin + AUCTIONURI;
   },
   getCookieSyncUrl() {
-    return this.propertyBag.whitelabel.cookieSyncUrl;
+    const ep = config.getConfig('ozone.endpointOverride') || {};
+    if (ep.cookieSyncUrl) return ep.cookieSyncUrl;
+    const origin = ep.origin || ORIGIN;
+    return origin + OZONECOOKIESYNC;
   },
   getRendererUrl() {
-    return this.propertyBag.whitelabel.rendererUrl;
+    const ep = config.getConfig('ozone.endpointOverride') || {};
+    return ep.rendererUrl || OZONE_RENDERER_URL;
   },
-  getVideoPlacementValue: function(context) {
-    if (['instream', 'outstream'].indexOf(context) < 0) return null; /* do not allow arbitrary strings */
-    return deepAccess(this.propertyBag, `whitelabel.videoParams.${context}`, null);
+  getVideoPlacementValue(context) {
+    if (['instream', 'outstream'].indexOf(context) < 0) return null;
+    return deepAccess(config.getConfig('ozone.videoParams'), context);
   },
   getBatchRequests() {
-    if (this.propertyBag.whitelabel.batchRequests === true) { return 10; }
-    if (typeof this.propertyBag.whitelabel.batchRequests === 'number' && this.propertyBag.whitelabel.batchRequests > 0) {
-      return this.propertyBag.whitelabel.batchRequests;
+    const batch = config.getConfig('ozone.batchRequests');
+    if (batch === true) return 10;
+    if (typeof batch === 'number' && batch > 0) {
+      return batch;
     }
     return false;
   },
   isBidRequestValid(bid) {
     let vf = 'VALIDATION FAILED';
-    this.loadWhitelabelData(bid);
-    logInfo('isBidRequestValid : ', config.getConfig(), bid);
+    info('isBidRequestValid : ', config.getConfig(), bid);
     let adUnitCode = bid.adUnitCode; // adunit[n].code
     let err1 = `${vf} : missing {param} : siteId, placementId and publisherId are REQUIRED`;
     if (!(getBidIdParameter('placementId', bid.params))) {
@@ -196,11 +128,10 @@ export const spec = {
     return placementId.toString().match(/^[0-9]{10}$/);
   },
   buildRequests(validBidRequests, bidderRequest) {
-    this.loadWhitelabelData(validBidRequests[0]);
     this.propertyBag.buildRequestsStart = new Date().getTime();
-    let whitelabelBidder = this.propertyBag.whitelabel.bidder; // by default = ozone
-    let whitelabelPrefix = this.propertyBag.whitelabel.keyPrefix;
-    logInfo(`buildRequests time: ${this.propertyBag.buildRequestsStart} v ${OZONEVERSION} validBidRequests`, deepClone(validBidRequests), 'bidderRequest', deepClone(bidderRequest));
+    const whitelabelBidder = BIDDER_CODE;
+    const whitelabelPrefix = KEY_PREFIX;
+    info(`buildRequests time: ${this.propertyBag.buildRequestsStart} v ${OZONEVERSION} validBidRequests`, deepClone(validBidRequests), 'bidderRequest', deepClone(bidderRequest));
     if (this.blockTheRequest()) {
       return [];
     }
@@ -212,18 +143,18 @@ export const spec = {
       this.cookieSyncBag.publisherId = deepAccess(validBidRequests[0], 'params.publisherId');
       htmlParams = validBidRequests[0].params;
     }
-    logInfo('cookie sync bag', this.cookieSyncBag);
-    let singleRequest = this.getWhitelabelConfigItem('ozone.singleRequest');
+    info('cookie sync bag', this.cookieSyncBag);
+    let singleRequest = config.getConfig('ozone.singleRequest');
     singleRequest = singleRequest !== false; // undefined & true will be true
     let ozoneRequest = {}; // we only want to set specific properties on this, not validBidRequests[0].params
     let fpd = deepAccess(bidderRequest, 'ortb2', null);
-    logInfo('got ortb2 fpd: ', fpd);
+    info('got ortb2 fpd: ', fpd);
     if (fpd && deepAccess(fpd, 'user')) {
-      logInfo('added FPD user object');
+      info('added FPD user object');
       ozoneRequest.user = fpd.user;
     }
     const getParams = this.getGetParametersAsObject();
-    const wlOztestmodeKey = whitelabelPrefix + 'testmode';
+    const wlOztestmodeKey = 'oztestmode';
     const isTestMode = getParams[wlOztestmodeKey] || null; // this can be any string, it's used for testing ads
     ozoneRequest.device = bidderRequest?.ortb2?.device || {}; // 20240925 rupesh changed this
     let placementIdOverrideFromGetParam = this.getPlacementIdOverrideFromGetParam(); // null or string
@@ -243,31 +174,32 @@ export const spec = {
         if (ozoneBidRequest.hasOwnProperty('sizes')) {
           arrBannerSizes = ozoneBidRequest.sizes;
         } else {
-          logInfo('no mediaTypes or sizes array. Cannot set sizes for banner type');
+          info('no mediaTypes or sizes array. Cannot set sizes for banner type');
         }
       } else {
         if (ozoneBidRequest.mediaTypes.hasOwnProperty(BANNER)) {
           arrBannerSizes = ozoneBidRequest.mediaTypes[BANNER].sizes; /* Note - if there is a sizes element in the config root it will be pushed into here */
-          logInfo('setting banner size from mediaTypes.banner for bidId ' + obj.id + ': ', arrBannerSizes);
+          info('setting banner size from mediaTypes.banner for bidId ' + obj.id + ': ', arrBannerSizes);
         }
         if (ozoneBidRequest.mediaTypes.hasOwnProperty(VIDEO)) {
-          logInfo('openrtb 2.5 compliant video');
+          info('openrtb 2.5 compliant video');
           if (typeof ozoneBidRequest.mediaTypes[VIDEO] == 'object') {
             let childConfig = deepAccess(ozoneBidRequest, 'params.video', {});
             obj.video = this.unpackVideoConfigIntoIABformat(ozoneBidRequest.mediaTypes[VIDEO], childConfig);
             obj.video = this.addVideoDefaults(obj.video, ozoneBidRequest.mediaTypes[VIDEO], childConfig);
           }
           let wh = getWidthAndHeightFromVideoObject(obj.video);
-          logInfo(`setting video object ${obj.id} from mediaTypes.video: `, obj.video, 'wh=', wh);
+          info(`setting video object ${obj.id} from mediaTypes.video: `, obj.video, 'wh=', wh);
           let settingToBe = 'setting obj.video.format to be '; // partial, reusable phrase
           if (wh && typeof wh === 'object') {
             obj.video.w = wh['w'];
             obj.video.h = wh['h'];
-            if (playerSizeIsNestedArray(obj.video)) { // this should never happen; it was in the original spec for this change though.
-              logInfo(`${settingToBe} an array of objects`);
+            const ps = getPlayerSizeFromObject(obj.video);
+            if (ps && Array.isArray(ps[0])) {
+              info(`${settingToBe} an array of objects`);
               obj.video.ext.format = [wh];
             } else {
-              logInfo(`${settingToBe} an object`);
+              info(`${settingToBe} an object`);
               obj.video.ext.format = wh;
             }
           } else {
@@ -276,13 +208,13 @@ export const spec = {
         }
         if (ozoneBidRequest.mediaTypes.hasOwnProperty(NATIVE)) {
           obj.native = ozoneBidRequest.mediaTypes[NATIVE];
-          logInfo(`setting native object ${obj.id} from mediaTypes.native element:`, obj.native);
+          info(`setting native object ${obj.id} from mediaTypes.native element:`, obj.native);
         }
         if (ozoneBidRequest.hasOwnProperty('getFloor')) {
           obj.floor = this.getFloorObjectForAuction(ozoneBidRequest);
-          logInfo('obj.floor is : ', obj.floor);
+          info('obj.floor is : ', obj.floor);
         } else {
-          logInfo('no getFloor property');
+          info('no getFloor property');
         }
       }
       if (arrBannerSizes.length > 0) {
@@ -310,9 +242,9 @@ export const spec = {
           logError(`Ignoring invalid ozFloor value for adunit code: ${ozoneBidRequest.adUnitCode}`);
         }
       }
-      logInfo(`obj.ext.${whitelabelBidder} is `, obj.ext[whitelabelBidder]);
+      info(`obj.ext.${whitelabelBidder} is `, obj.ext[whitelabelBidder]);
       if (isTestMode != null) {
-        logInfo(`setting isTestMode: ${isTestMode}`);
+        info(`setting isTestMode: ${isTestMode}`);
         if (obj.ext[whitelabelBidder].hasOwnProperty('customData')) {
           for (let i = 0; i < obj.ext[whitelabelBidder].customData.length; i++) {
             obj.ext[whitelabelBidder].customData[i]['targeting'][wlOztestmodeKey] = isTestMode;
@@ -323,7 +255,7 @@ export const spec = {
         }
       }
       if (fpd && deepAccess(fpd, 'site')) {
-        logInfo('adding fpd.site');
+        info('adding fpd.site');
         if (deepAccess(obj, `ext.${whitelabelBidder}.customData.0.targeting`, false)) {
           Object.assign(obj.ext[whitelabelBidder].customData[0].targeting, fpd.site);
         } else {
@@ -365,21 +297,20 @@ export const spec = {
       }
     }
     extObj[whitelabelBidder].pv = this.getPageId(); // attach the page ID that will be common to all auction calls for this page if refresh() is called
-    let ozOmpFloorDollars = this.getWhitelabelConfigItem('ozone.oz_omp_floor'); // valid only if a dollar value (typeof == 'number')
-    logInfo(`${whitelabelPrefix}_omp_floor dollar value = `, ozOmpFloorDollars);
+    let ozOmpFloorDollars = config.getConfig('ozone.oz_omp_floor'); // valid only if a dollar value (typeof == 'number')
+    info(`${whitelabelPrefix}_omp_floor dollar value = `, ozOmpFloorDollars);
     if (typeof ozOmpFloorDollars === 'number') {
       extObj[whitelabelBidder][`${whitelabelPrefix}_omp_floor`] = ozOmpFloorDollars;
     } else if (typeof ozOmpFloorDollars !== 'undefined') {
       logError(`IF set, ${whitelabelPrefix}_omp_floor must be a number eg. 1.55. Found:` + (typeof ozOmpFloorDollars));
     }
-    let ozWhitelistAdserverKeys = this.getWhitelabelConfigItem('ozone.oz_whitelist_adserver_keys');
+    let ozWhitelistAdserverKeys = config.getConfig('ozone.oz_whitelist_adserver_keys');
     let useOzWhitelistAdserverKeys = isArray(ozWhitelistAdserverKeys) && ozWhitelistAdserverKeys.length > 0;
     extObj[whitelabelBidder][whitelabelPrefix + '_kvp_rw'] = useOzWhitelistAdserverKeys ? 1 : 0;
-    if (whitelabelBidder !== 'ozone') {
-      logInfo('setting aliases object');
-      extObj.prebid = {aliases: {'ozone': whitelabelBidder}};
+    const endpointOverride = config.getConfig('ozone.endpointOverride');
+    if (endpointOverride?.origin || endpointOverride?.auctionUrl) {
+      extObj[whitelabelBidder].origin = endpointOverride.auctionUrl || endpointOverride.origin;
     }
-    if (this.propertyBag.endpointOverride != null) { extObj[whitelabelBidder]['origin'] = this.propertyBag.endpointOverride; }
     let userExtEids = deepAccess(validBidRequests, '0.userIdAsEids', []); // generate the UserIDs in the correct format for UserId module
     ozoneRequest.site = {
       'publisher': {'id': htmlParams.publisherId},
@@ -388,7 +319,7 @@ export const spec = {
     };
     ozoneRequest.test = config.getConfig('debug') ? 1 : 0;
     if (bidderRequest && bidderRequest.gdprConsent) {
-      logInfo('ADDING GDPR');
+      info('ADDING GDPR');
       let apiVersion = deepAccess(bidderRequest, 'gdprConsent.apiVersion', 1);
       ozoneRequest.regs = {ext: {gdpr: bidderRequest.gdprConsent.gdprApplies ? 1 : 0, apiVersion: apiVersion}};
       if (deepAccess(ozoneRequest, 'regs.ext.gdpr')) {
@@ -397,30 +328,30 @@ export const spec = {
         logWarn('**** Strange CMP info: bidderRequest.gdprConsent exists BUT bidderRequest.gdprConsent.gdprApplies is false. See bidderRequest logged above. ****');
       }
     } else {
-      logInfo('WILL NOT ADD GDPR info; no bidderRequest.gdprConsent object');
+      info('WILL NOT ADD GDPR info; no bidderRequest.gdprConsent object');
     }
     if (bidderRequest && bidderRequest.uspConsent) {
-      logInfo('ADDING USP consent info');
+      info('ADDING USP consent info');
       deepSetValue(ozoneRequest, 'regs.ext.us_privacy', bidderRequest.uspConsent);
     } else {
-      logInfo('WILL NOT ADD USP consent info; no bidderRequest.uspConsent.');
+      info('WILL NOT ADD USP consent info; no bidderRequest.uspConsent.');
     }
     if (bidderRequest?.ortb2?.regs?.gpp) {
       deepSetValue(ozoneRequest, 'regs.gpp', bidderRequest.ortb2.regs.gpp);
       deepSetValue(ozoneRequest, 'regs.gpp_sid', bidderRequest.ortb2.regs.gpp_sid);
     }
     if (schain) { // we set this while iterating over the bids
-      logInfo('schain found');
+      info('schain found');
       deepSetValue(ozoneRequest, 'source.ext.schain', schain);
     }
     if (config.getConfig('coppa') === true) {
       deepSetValue(ozoneRequest, 'regs.coppa', 1);
     }
     extObj[whitelabelBidder].cookieDeprecationLabel = deepAccess(bidderRequest, 'ortb2.device.ext.cdep', 'none');
-    logInfo(`cookieDeprecationLabel ortb2.device.ext.cdep = ${extObj[whitelabelBidder].cookieDeprecationLabel}`);
+    info(`cookieDeprecationLabel ortb2.device.ext.cdep = ${extObj[whitelabelBidder].cookieDeprecationLabel}`);
     let batchRequestsVal = this.getBatchRequests(); // false|numeric
     if (typeof batchRequestsVal === 'number') {
-      logInfo(`Batching = ${batchRequestsVal}`);
+      info(`Batching = ${batchRequestsVal}`);
       let arrRet = []; // return an array of objects containing data describing max 10 bids
       for (let i = 0; i < tosendtags.length; i += batchRequestsVal) {
         ozoneRequest.id = generateUUID(); // Unique ID of the bid request, provided by the exchange. (REQUIRED)
@@ -430,6 +361,7 @@ export const spec = {
         }
         ozoneRequest.imp = tosendtags.slice(i, i + batchRequestsVal);
         ozoneRequest.ext = extObj;
+        toOrtb25(ozoneRequest);
         if (ozoneRequest.imp.length > 0) {
           arrRet.push({
             method: 'POST',
@@ -439,14 +371,15 @@ export const spec = {
           });
         }
       }
-      logInfo('batch request going to return : ', arrRet);
+      info('batch request going to return : ', arrRet);
       return arrRet;
     }
     if (singleRequest) {
-      logInfo('single request starting');
+      info('single request starting');
       ozoneRequest.id = generateUUID(); // Unique ID of the bid request, provided by the exchange. (REQUIRED)
       ozoneRequest.imp = tosendtags;
       ozoneRequest.ext = extObj;
+      toOrtb25(ozoneRequest);
       deepSetValue(ozoneRequest, 'user.ext.eids', userExtEids);
       if (auctionId) {
         deepSetValue(ozoneRequest, 'source.tid', auctionId);
@@ -458,11 +391,11 @@ export const spec = {
         bidderRequest: bidderRequest
       };
       this.propertyBag.buildRequestsEnd = new Date().getTime();
-      logInfo(`buildRequests going to return for single at time ${this.propertyBag.buildRequestsEnd} (took ${this.propertyBag.buildRequestsEnd - this.propertyBag.buildRequestsStart}ms): `, deepClone(ret));
+      info(`buildRequests going to return for single at time ${this.propertyBag.buildRequestsEnd} (took ${this.propertyBag.buildRequestsEnd - this.propertyBag.buildRequestsStart}ms): `, deepClone(ret));
       return ret;
     }
     let arrRet = tosendtags.map(imp => {
-      logInfo('non-single response, working on imp : ', imp);
+      info('non-single response, working on imp : ', imp);
       let ozoneRequestSingle = Object.assign({}, ozoneRequest);
       ozoneRequestSingle.id = generateUUID(); // Unique ID of the bid request, provided by the exchange. (REQUIRED)
       ozoneRequestSingle.imp = [imp];
@@ -471,6 +404,7 @@ export const spec = {
       if (auctionId) {
         deepSetValue(ozoneRequestSingle, 'source.tid', auctionId);
       }
+      toOrtb25(ozoneRequestSingle);
       return {
         method: 'POST',
         url: this.getAuctionUrl(),
@@ -479,7 +413,7 @@ export const spec = {
       };
     });
     this.propertyBag.buildRequestsEnd = new Date().getTime();
-    logInfo(`buildRequests going to return for non-single at time ${this.propertyBag.buildRequestsEnd} (took ${this.propertyBag.buildRequestsEnd - this.propertyBag.buildRequestsStart}ms): `, arrRet);
+    info(`buildRequests going to return for non-single at time ${this.propertyBag.buildRequestsEnd} (took ${this.propertyBag.buildRequestsEnd - this.propertyBag.buildRequestsStart}ms): `, arrRet);
     return arrRet;
   },
   getFloorObjectForAuction(bidRequestRef) {
@@ -488,7 +422,7 @@ export const spec = {
       video: deepAccess(bidRequestRef, 'mediaTypes.video.playerSize', null),
       native: deepAccess(bidRequestRef, 'mediaTypes.native.image.sizes', null)
     }
-    logInfo('getFloorObjectForAuction mediaTypesSizes : ', mediaTypesSizes);
+    info('getFloorObjectForAuction mediaTypesSizes : ', mediaTypesSizes);
     let ret = {};
     if (mediaTypesSizes.banner) {
       ret.banner = bidRequestRef.getFloor({mediaType: 'banner', currency: 'USD', size: mediaTypesSizes.banner[0]});
@@ -499,16 +433,15 @@ export const spec = {
     if (mediaTypesSizes.native) {
       ret.native = bidRequestRef.getFloor({mediaType: 'native', currency: 'USD', size: mediaTypesSizes.native[0]});
     }
-    logInfo('getFloorObjectForAuction returning : ', deepClone(ret));
+    info('getFloorObjectForAuction returning : ', deepClone(ret));
     return ret;
   },
   interpretResponse(serverResponse, request) {
-    if (request && request.bidderRequest && request.bidderRequest.bids) { this.loadWhitelabelData(request.bidderRequest.bids[0]); }
     let startTime = new Date().getTime();
-    let whitelabelBidder = this.propertyBag.whitelabel.bidder; // by default = ozone
-    let whitelabelPrefix = this.propertyBag.whitelabel.keyPrefix;
-    logInfo(`interpretResponse time: ${startTime} . Time between buildRequests done and interpretResponse start was ${startTime - this.propertyBag.buildRequestsEnd}ms`);
-    logInfo(`serverResponse, request`, deepClone(serverResponse), deepClone(request));
+    const whitelabelBidder = BIDDER_CODE;
+    const whitelabelPrefix = KEY_PREFIX;
+    info(`interpretResponse time: ${startTime} . Time between buildRequests done and interpretResponse start was ${startTime - this.propertyBag.buildRequestsEnd}ms`);
+    info(`serverResponse, request`, deepClone(serverResponse), deepClone(request));
     serverResponse = serverResponse.body || {};
     let aucId = serverResponse.id; // this will be correct for single requests and non-single
     if (!serverResponse.hasOwnProperty('seatbid')) {
@@ -519,49 +452,49 @@ export const spec = {
     }
     let arrAllBids = [];
     let labels;
-    let enhancedAdserverTargeting = this.getWhitelabelConfigItem('ozone.enhancedAdserverTargeting');
-    logInfo('enhancedAdserverTargeting', enhancedAdserverTargeting);
+    let enhancedAdserverTargeting = config.getConfig('ozone.enhancedAdserverTargeting');
+    info('enhancedAdserverTargeting', enhancedAdserverTargeting);
     if (typeof enhancedAdserverTargeting == 'undefined') {
       enhancedAdserverTargeting = true;
     }
-    logInfo('enhancedAdserverTargeting', enhancedAdserverTargeting);
+    info('enhancedAdserverTargeting', enhancedAdserverTargeting);
     serverResponse.seatbid = injectAdIdsIntoAllBidResponses(serverResponse.seatbid); // we now make sure that each bid in the bidresponse has a unique (within page) adId attribute.
     serverResponse.seatbid = this.removeSingleBidderMultipleBids(serverResponse.seatbid);
-    let ozOmpFloorDollars = this.getWhitelabelConfigItem('ozone.oz_omp_floor'); // valid only if a dollar value (typeof == 'number')
+    let ozOmpFloorDollars = config.getConfig('ozone.oz_omp_floor'); // valid only if a dollar value (typeof == 'number')
     let addOzOmpFloorDollars = typeof ozOmpFloorDollars === 'number';
-    let ozWhitelistAdserverKeys = this.getWhitelabelConfigItem('ozone.oz_whitelist_adserver_keys');
+    let ozWhitelistAdserverKeys = config.getConfig('ozone.oz_whitelist_adserver_keys');
     let useOzWhitelistAdserverKeys = isArray(ozWhitelistAdserverKeys) && ozWhitelistAdserverKeys.length > 0;
     for (let i = 0; i < serverResponse.seatbid.length; i++) {
       let sb = serverResponse.seatbid[i];
       for (let j = 0; j < sb.bid.length; j++) {
         let thisRequestBid = this.getBidRequestForBidId(sb.bid[j].impid, request.bidderRequest.bids);
-        logInfo(`seatbid:${i}, bid:${j} Going to set default w h for seatbid/bidRequest`, sb.bid[j], thisRequestBid);
+        info(`seatbid:${i}, bid:${j} Going to set default w h for seatbid/bidRequest`, sb.bid[j], thisRequestBid);
         let {defaultWidth, defaultHeight} = defaultSize(thisRequestBid);
         let thisBid = ozoneAddStandardProperties(sb.bid[j], defaultWidth, defaultHeight);
         thisBid.meta = {advertiserDomains: thisBid.adomain || []};
         let videoContext = null;
         let isVideo = false;
         let bidType = deepAccess(thisBid, 'ext.prebid.type');
-        logInfo(`this bid type is : ${bidType}`);
+        info(`this bid type is : ${bidType}`);
         let adserverTargeting = {};
         if (bidType === VIDEO) {
           isVideo = true;
           this.setBidMediaTypeIfNotExist(thisBid, VIDEO);
           videoContext = this.getVideoContextForBidId(thisBid.bidId, request.bidderRequest.bids); // should be instream or outstream (or null if error)
           if (videoContext === 'outstream') {
-            logInfo('setting thisBid.mediaType = VIDEO & attach a renderer to OUTSTREAM video');
+            info('setting thisBid.mediaType = VIDEO & attach a renderer to OUTSTREAM video');
             thisBid.renderer = newRenderer(thisBid.bidId);
             thisBid.vastUrl = `https://${deepAccess(thisBid, 'ext.prebid.targeting.hb_cache_host', 'missing_host')}${deepAccess(thisBid, 'ext.prebid.targeting.hb_cache_path', 'missing_path')}?uuid=${deepAccess(thisBid, 'ext.prebid.targeting.hb_uuid', 'missing_uuid')}`;
             thisBid.vastXml = thisBid.adm;
           } else {
-            logInfo('not an outstream video (presumably instream), will set thisBid.mediaType = VIDEO and thisBid.vastUrl and not attach a renderer');
+            info('not an outstream video (presumably instream), will set thisBid.mediaType = VIDEO and thisBid.vastUrl and not attach a renderer');
             thisBid.vastUrl = `https://${deepAccess(thisBid, 'ext.prebid.targeting.hb_cache_host', 'missing_host')}${deepAccess(thisBid, 'ext.prebid.targeting.hb_cache_path', 'missing_path')}?uuid=${deepAccess(thisBid, 'ext.prebid.targeting.hb_uuid', 'missing_uuid')}`; // need to see if this works ok for ozone
             if (!thisBid.hasOwnProperty('videoCacheKey')) {
               let videoCacheUuid = deepAccess(thisBid, 'ext.prebid.targeting.hb_uuid', 'no_hb_uuid');
-              logInfo(`Adding videoCacheKey: ${videoCacheUuid}`);
+              info(`Adding videoCacheKey: ${videoCacheUuid}`);
               thisBid.videoCacheKey = videoCacheUuid;
             } else {
-              logInfo('videoCacheKey already exists on the bid object, will not add it');
+              info('videoCacheKey already exists on the bid object, will not add it');
             }
           }
         } else {
@@ -570,9 +503,9 @@ export const spec = {
         adserverTargeting = Object.assign(adserverTargeting, deepAccess(thisBid, 'ext.prebid.targeting', {}));
         if (enhancedAdserverTargeting) {
           let allBidsForThisBidid = ozoneGetAllBidsForBidId(thisBid.bidId, serverResponse.seatbid, defaultWidth, defaultHeight);
-          logInfo('Going to iterate allBidsForThisBidId', deepClone(allBidsForThisBidid));
+          info('Going to iterate allBidsForThisBidId', deepClone(allBidsForThisBidid));
           Object.keys(allBidsForThisBidid).forEach((bidderName, index, ar2) => {
-            logInfo(`adding adserverTargeting for ${bidderName} for bidId ${thisBid.bidId}`);
+            info(`adding adserverTargeting for ${bidderName} for bidId ${thisBid.bidId}`);
             adserverTargeting[whitelabelPrefix + '_' + bidderName] = bidderName;
             adserverTargeting[whitelabelPrefix + '_' + bidderName + '_crid'] = String(allBidsForThisBidid[bidderName].crid);
             adserverTargeting[whitelabelPrefix + '_' + bidderName + '_adv'] = String(allBidsForThisBidid[bidderName].adomain);
@@ -609,7 +542,7 @@ export const spec = {
           if (useOzWhitelistAdserverKeys) {
             logWarn(`Your adserver keys whitelist will be ignored - ${perBidInfo}`);
           } else {
-            logInfo(perBidInfo);
+            info(perBidInfo);
           }
         }
         let {seat: winningSeat, bid: winningBid} = ozoneGetWinnerForRequestBid(thisBid.bidId, serverResponse.seatbid);
@@ -632,7 +565,7 @@ export const spec = {
           adserverTargeting[whitelabelPrefix + '_size'] = `${winningBid.width}x${winningBid.height}`;
         }
         if (useOzWhitelistAdserverKeys) { // delete any un-whitelisted keys
-          logInfo('Filtering out adserver targeting keys not in the whitelist: ', ozWhitelistAdserverKeys);
+          info('Filtering out adserver targeting keys not in the whitelist: ', ozWhitelistAdserverKeys);
           Object.keys(adserverTargeting).forEach(function(key) { if (ozWhitelistAdserverKeys.indexOf(key) === -1) { delete adserverTargeting[key]; } });
         }
         thisBid.adserverTargeting = adserverTargeting;
@@ -642,9 +575,9 @@ export const spec = {
     let ret = arrAllBids;
     let fledgeAuctionConfigs = deepAccess(serverResponse, 'ext.igi') || []; // 20240606 standardising
     if (isArray(fledgeAuctionConfigs) && fledgeAuctionConfigs.length > 0) {
-      fledgeAuctionConfigs = fledgeAuctionConfigs.filter(config => {
-        if (!this.isValidAuctionConfig(config)) {
-          logWarn('Removing malformed fledge auction config:', config);
+      fledgeAuctionConfigs = fledgeAuctionConfigs.filter(cfg => {
+        if (typeof cfg !== 'object' || cfg === null) {
+          logWarn('Removing malformed fledge auction config:', cfg);
           return false;
         }
         return true;
@@ -655,26 +588,17 @@ export const spec = {
       };
     }
     let endTime = new Date().getTime();
-    logInfo(`interpretResponse going to return at time ${endTime} (took ${endTime - startTime}ms) Time from buildRequests Start -> interpretRequests End = ${endTime - this.propertyBag.buildRequestsStart}ms`);
-    logInfo('will return: ', deepClone(ret)); // this is ok to log because the renderer has not been attached yet
+    info(`interpretResponse going to return at time ${endTime} (took ${endTime - startTime}ms) Time from buildRequests Start -> interpretRequests End = ${endTime - this.propertyBag.buildRequestsStart}ms`);
+    info('will return: ', deepClone(ret)); // this is ok to log because the renderer has not been attached yet
     return ret;
-  },
-  isValidAuctionConfig(config) {
-    return typeof config === 'object' && config !== null;
   },
   setBidMediaTypeIfNotExist(thisBid, mediaType) {
     if (!thisBid.hasOwnProperty('mediaType')) {
-      logInfo(`setting thisBid.mediaType = ${mediaType}`);
+      info(`setting thisBid.mediaType = ${mediaType}`);
       thisBid.mediaType = mediaType;
     } else {
-      logInfo(`found value for thisBid.mediaType: ${thisBid.mediaType}`);
+      info(`found value for thisBid.mediaType: ${thisBid.mediaType}`);
     }
-  },
-  getWhitelabelConfigItem(ozoneVersion) {
-    if (this.propertyBag.whitelabel.bidder === 'ozone') { return config.getConfig(ozoneVersion); }
-    let whitelabelledSearch = ozoneVersion.replace('ozone', this.propertyBag.whitelabel.bidder);
-    whitelabelledSearch = whitelabelledSearch.replace('oz_', this.propertyBag.whitelabel.keyPrefix + '_');
-    return config.getConfig(whitelabelledSearch);
   },
   removeSingleBidderMultipleBids(seatbid) {
     var ret = [];
@@ -684,7 +608,7 @@ export const spec = {
       var bidIds = [];
       for (let j = 0; j < sb.bid.length; j++) {
         var candidate = sb.bid[j];
-        if (contains(bidIds, candidate.impid)) {
+        if (bidIds.includes(candidate.impid)) {
           continue; // we've already fully assessed this impid, found the highest bid from this seat for it
         }
         bidIds.push(candidate.impid);
@@ -700,39 +624,34 @@ export const spec = {
     return ret;
   },
   getUserSyncs(optionsType, serverResponse, gdprConsent, usPrivacy, gppConsent = {}) {
-    logInfo('getUserSyncs optionsType', optionsType, 'serverResponse', serverResponse, 'gdprConsent', gdprConsent, 'usPrivacy', usPrivacy, 'cookieSyncBag', this.cookieSyncBag);
+    info('getUserSyncs optionsType', optionsType, 'serverResponse', serverResponse, 'gdprConsent', gdprConsent, 'usPrivacy', usPrivacy, 'cookieSyncBag', this.cookieSyncBag);
     if (!serverResponse || serverResponse.length === 0) {
       return [];
     }
     let { gppString = '', applicableSections = [] } = gppConsent;
     if (optionsType.iframeEnabled) {
-      var arrQueryString = [];
+      const params = new URLSearchParams({
+        gdpr: deepAccess(gdprConsent, 'gdprApplies', false) ? '1' : '0',
+        gdpr_consent: deepAccess(gdprConsent, 'consentString', ''),
+        usp_consent: usPrivacy || '',
+        gpp: gppString,
+        bidder: BIDDER_CODE,
+        publisherId: this.cookieSyncBag.publisherId,
+        siteId: this.cookieSyncBag.siteId,
+        cb: Date.now()
+      });
+      if (Array.isArray(applicableSections)) {
+        params.set('gpp_sid', applicableSections.join());
+      }
+      for (const keyname in this.cookieSyncBag.userIdObject) {
+        params.set(keyname, this.cookieSyncBag.userIdObject[keyname]);
+      }
       if (config.getConfig('debug')) {
-        arrQueryString.push('pbjs_debug=true');
+        params.set('pbjs_debug', 'true');
       }
-      arrQueryString.push('gdpr=' + (deepAccess(gdprConsent, 'gdprApplies', false) ? '1' : '0'));
-      arrQueryString.push('gdpr_consent=' + deepAccess(gdprConsent, 'consentString', ''));
-      arrQueryString.push('usp_consent=' + (usPrivacy || ''));
-      arrQueryString.push('gpp=' + gppString);
-      if (isArray(applicableSections)) {
-        arrQueryString.push(`gpp_sid=${applicableSections.join()}`);
-      }
-      for (let keyname in this.cookieSyncBag.userIdObject) {
-        arrQueryString.push(keyname + '=' + this.cookieSyncBag.userIdObject[keyname]);
-      }
-      arrQueryString.push('publisherId=' + this.cookieSyncBag.publisherId);
-      arrQueryString.push('siteId=' + this.cookieSyncBag.siteId);
-      arrQueryString.push('cb=' + Date.now());
-      arrQueryString.push('bidder=' + this.propertyBag.whitelabel.bidder);
-      var strQueryString = arrQueryString.join('&');
-      if (strQueryString.length > 0) {
-        strQueryString = '?' + strQueryString;
-      }
-      logInfo('getUserSyncs going to return cookie sync url : ' + this.getCookieSyncUrl() + strQueryString);
-      return [{
-        type: 'iframe',
-        url: this.getCookieSyncUrl() + strQueryString
-      }];
+      const strQueryString = '?' + params.toString();
+      info('getUserSyncs going to return cookie sync url : ' + this.getCookieSyncUrl() + strQueryString);
+      return [{ type: 'iframe', url: this.getCookieSyncUrl() + strQueryString }];
     }
   },
   getBidRequestForBidId(bidId, arrBids) {
@@ -753,7 +672,7 @@ export const spec = {
   findAllUserIdsFromEids(bidRequest) {
     let ret = {};
     if (!bidRequest.hasOwnProperty('userIdAsEids')) {
-      logInfo('findAllUserIdsFromEids - no bidRequest.userIdAsEids object was found on the bid!');
+      info('findAllUserIdsFromEids - no bidRequest.userIdAsEids object was found on the bid!');
       this.tryGetPubCidFromOldLocation(ret, bidRequest); // legacy
       return ret;
     }
@@ -775,27 +694,26 @@ export const spec = {
     return (bidRequest.params.placementId).toString();
   },
   getPlacementIdOverrideFromGetParam() {
-    let whitelabelPrefix = this.propertyBag.whitelabel.keyPrefix;
     let arr = this.getGetParametersAsObject();
-    if (arr.hasOwnProperty(whitelabelPrefix + 'storedrequest')) {
-      if (this.isValidPlacementId(arr[whitelabelPrefix + 'storedrequest'])) {
-        logInfo(`using GET ${whitelabelPrefix}storedrequest=` + arr[whitelabelPrefix + 'storedrequest'] + ' to replace placementId');
-        return arr[whitelabelPrefix + 'storedrequest'];
+    if (arr.hasOwnProperty(KEY_PREFIX + 'storedrequest')) {
+      if (this.isValidPlacementId(arr[KEY_PREFIX + 'storedrequest'])) {
+        info(`using GET ${KEY_PREFIX}storedrequest=` + arr[KEY_PREFIX + 'storedrequest'] + ' to replace placementId');
+        return arr[KEY_PREFIX + 'storedrequest'];
       } else {
-        logError(`GET ${whitelabelPrefix}storedrequest FAILED VALIDATION - will not use it`);
+        logError(`GET ${KEY_PREFIX}storedrequest FAILED VALIDATION - will not use it`);
       }
     }
     return null;
   },
   getGetParametersAsObject() {
     let parsed = parseUrl(getRefererInfo().location);
-    logInfo('getGetParametersAsObject found:', parsed.search);
+    info('getGetParametersAsObject found:', parsed.search);
     return parsed.search;
   },
   blockTheRequest() {
-    let ozRequest = this.getWhitelabelConfigItem('ozone.oz_request');
+    const ozRequest = config.getConfig('ozone.oz_request');
     if (ozRequest === false) {
-      logWarn(`Will not allow the auction : ${this.propertyBag.whitelabel.keyPrefix}_request is set to false`);
+      logWarn('Will not allow the auction : oz_request is set to false');
       return true;
     }
     return false;
@@ -841,92 +759,50 @@ export const spec = {
     return ret;
   },
   addVideoDefaults(objRet, videoConfig, childConfig) {
-    objRet = this._addVideoDefaults(objRet, videoConfig, false);
-    objRet = this._addVideoDefaults(objRet, childConfig, true); // child config will override parent config
-    return objRet;
-  },
-  _addVideoDefaults(objRet, objConfig, addIfMissing) {
-    let placementValue = this.getVideoPlacementValue(deepAccess(objConfig, 'context'));
-    if (placementValue) {
-      objRet.placement = placementValue;
-    }
-    let skippable = deepAccess(objConfig, 'skippable', null);
-    if (skippable == null) {
-      if (addIfMissing && !objRet.hasOwnProperty('skip')) {
-        objRet.skip = 0;
+    const apply = (cfg, addIfMissing) => {
+      if (!cfg) return;
+      const placement = this.getVideoPlacementValue(deepAccess(cfg, 'context'));
+      if (placement) {
+        objRet.placement = placement;
       }
-    } else {
-      objRet.skip = skippable ? 1 : 0;
-    }
-    return objRet;
-  },
-  getLoggableBidObject(bid) {
-    let logObj = {
-      ad: bid.ad,
-      adId: bid.adId,
-      adUnitCode: bid.adUnitCode,
-      adm: bid.adm,
-      adomain: bid.adomain,
-      adserverTargeting: bid.adserverTargeting,
-      auctionId: bid.auctionId,
-      bidId: bid.bidId,
-      bidder: bid.bidder,
-      bidderCode: bid.bidderCode,
-      cpm: bid.cpm,
-      creativeId: bid.creativeId,
-      crid: bid.crid,
-      currency: bid.currency,
-      h: bid.h,
-      w: bid.w,
-      impid: bid.impid,
-      mediaType: bid.mediaType,
-      params: bid.params,
-      price: bid.price,
-      transactionId: bid.transactionId,
-      ttl: bid.ttl,
-      ortb2: deepAccess(bid, 'ortb2'),
-      ortb2Imp: deepAccess(bid, 'ortb2Imp'),
+      const skippable = deepAccess(cfg, 'skippable', null);
+      if (skippable == null) {
+        if (addIfMissing && !objRet.hasOwnProperty('skip')) {
+          objRet.skip = 0;
+        }
+      } else {
+        objRet.skip = skippable ? 1 : 0;
+      }
     };
-    if (bid.hasOwnProperty('floorData')) {
-      logObj.floorData = bid.floorData;
-    }
-    return logObj;
+    apply(videoConfig, false);
+    apply(childConfig, true);
+    return objRet;
   }
 };
 export function injectAdIdsIntoAllBidResponses(seatbid) {
-  logInfo('injectAdIdsIntoAllBidResponses', deepClone(seatbid));
+  info('injectAdIdsIntoAllBidResponses', deepClone(seatbid));
   for (let i = 0; i < seatbid.length; i++) {
     let sb = seatbid[i];
     for (let j = 0; j < sb.bid.length; j++) {
-      sb.bid[j]['adId'] = `${sb.bid[j]['impid']}-${i}-${spec.propertyBag.whitelabel.keyPrefix}-${j}`;
+      sb.bid[j]['adId'] = `${sb.bid[j]['impid']}-${i}-${KEY_PREFIX}-${j}`;
     }
   }
   return seatbid;
 }
-export function checkDeepArray(Arr) {
-  if (isArray(Arr)) {
-    if (isArray(Arr[0])) {
-      return Arr[0];
-    } else {
-      return Arr;
-    }
-  } else {
-    return Arr;
-  }
-}
 export function defaultSize(thebidObj) {
   if (!thebidObj) {
-    logInfo('defaultSize received empty bid obj! going to return fixed default size');
+    info('defaultSize received empty bid obj! going to return fixed default size');
     return {
       'defaultHeight': 250,
       'defaultWidth': 300
     };
   }
-  const {sizes} = thebidObj;
-  const returnObject = {};
-  returnObject.defaultWidth = checkDeepArray(sizes)[0];
-  returnObject.defaultHeight = checkDeepArray(sizes)[1];
-  return returnObject;
+  const sizes = thebidObj.sizes || [];
+  const first = Array.isArray(sizes[0]) ? sizes[0] : sizes;
+  return {
+    defaultWidth: first[0],
+    defaultHeight: first[1]
+  };
 }
 export function ozoneGetWinnerForRequestBid(requestBidId, serverResponseSeatBid) {
   let thisBidWinner = null;
@@ -967,52 +843,27 @@ export function ozoneGetAllBidsForBidId(matchBidId, serverResponseSeatBid, defau
   return objBids;
 }
 export function getRoundedBid(price, mediaType) {
-  const mediaTypeGranularity = config.getConfig(`mediaTypePriceGranularity.${mediaType}`); // might be string or object or nothing; if set then this takes precedence over 'priceGranularity'
-  let objBuckets = config.getConfig('customPriceBucket'); // this is always an object - {} if strBuckets is not 'custom'
-  let strBuckets = config.getConfig('priceGranularity'); // priceGranularity value, always a string ** if priceGranularity is set to an object then it's always 'custom' **
-  let theConfigObject = getGranularityObject(mediaType, mediaTypeGranularity, strBuckets, objBuckets);
-  let theConfigKey = getGranularityKeyName(mediaType, mediaTypeGranularity, strBuckets);
-  logInfo('getRoundedBid. price:', price, 'mediaType:', mediaType, 'configkey:', theConfigKey, 'configObject:', theConfigObject, 'mediaTypeGranularity:', mediaTypeGranularity, 'strBuckets:', strBuckets);
-  let priceStringsObj = getPriceBucketString(
-    price,
-    theConfigObject,
-    config.getConfig('currency.granularityMultiplier')
-  );
-  logInfo('priceStringsObj', priceStringsObj);
-  let granularityNamePriceStringsKeyMapping = {
-    'medium': 'med',
-    'custom': 'custom',
-    'high': 'high',
-    'low': 'low',
-    'dense': 'dense'
-  };
-  if (granularityNamePriceStringsKeyMapping.hasOwnProperty(theConfigKey)) {
-    let priceStringsKey = granularityNamePriceStringsKeyMapping[theConfigKey];
-    logInfo('getRoundedBid: looking for priceStringsKey:', priceStringsKey);
-    return priceStringsObj[priceStringsKey];
-  }
-  return priceStringsObj['auto'];
-}
-export function getGranularityKeyName(mediaType, mediaTypeGranularity, strBuckets) {
+  const mediaTypeGranularity = config.getConfig(`mediaTypePriceGranularity.${mediaType}`);
+  let key = 'auto';
+  let buckets = config.getConfig('customPriceBucket');
   if (typeof mediaTypeGranularity === 'string') {
-    return mediaTypeGranularity;
+    key = mediaTypeGranularity;
+  } else if (typeof mediaTypeGranularity === 'object') {
+    key = 'custom';
+    buckets = mediaTypeGranularity;
+  } else {
+    const strBuckets = config.getConfig('priceGranularity');
+    if (typeof strBuckets === 'string') {
+      key = strBuckets;
+    }
+    if (strBuckets === 'custom') {
+      key = 'custom';
+    }
   }
-  if (typeof mediaTypeGranularity === 'object') {
-    return 'custom';
-  }
-  if (typeof strBuckets === 'string') {
-    return strBuckets;
-  }
-  return 'auto'; // fall back to a default key - should literally never be needed.
-}
-export function getGranularityObject(mediaType, mediaTypeGranularity, strBuckets, objBuckets) {
-  if (typeof mediaTypeGranularity === 'object') {
-    return mediaTypeGranularity;
-  }
-  if (strBuckets === 'custom') {
-    return objBuckets;
-  }
-  return '';
+  const mapping = {medium: 'med', custom: 'custom', high: 'high', low: 'low', dense: 'dense'};
+  const priceStrings = getPriceBucketString(price, buckets, config.getConfig('currency.granularityMultiplier'));
+  info('getRoundedBid price:', price, 'mediaType:', mediaType, 'bucketKey:', key);
+  return priceStrings[mapping[key] || 'auto'];
 }
 export function ozoneAddStandardProperties(seatBid, defaultWidth, defaultHeight) {
   seatBid.cpm = seatBid.price;
@@ -1033,7 +884,7 @@ export function getWidthAndHeightFromVideoObject(objVideo) {
     return null;
   }
   if (playerSize[0] && typeof playerSize[0] === 'object') {
-    logInfo('getWidthAndHeightFromVideoObject found nested array inside playerSize.', playerSize[0]);
+    info('getWidthAndHeightFromVideoObject found nested array inside playerSize.', playerSize[0]);
     playerSize = playerSize[0];
     if (typeof playerSize[0] !== 'number' && typeof playerSize[0] !== 'string') {
       logError('getWidthAndHeightFromVideoObject found non-number/string type inside the INNER array in playerSize. This is totally wrong - cannot continue.', playerSize[0]);
@@ -1046,18 +897,8 @@ export function getWidthAndHeightFromVideoObject(objVideo) {
   }
   return ({'w': playerSize[0], 'h': playerSize[1]});
 }
-export function playerSizeIsNestedArray(objVideo) {
-  let playerSize = getPlayerSizeFromObject(objVideo);
-  if (!playerSize) {
-    return null;
-  }
-  if (playerSize.length < 1) {
-    return null;
-  }
-  return (playerSize[0] && typeof playerSize[0] === 'object');
-}
 function getPlayerSizeFromObject(objVideo) {
-  logInfo('getPlayerSizeFromObject received object', objVideo);
+  info('getPlayerSizeFromObject received object', objVideo);
   let playerSize = deepAccess(objVideo, 'playerSize');
   if (!playerSize) {
     playerSize = deepAccess(objVideo, 'ext.playerSize');
@@ -1072,29 +913,30 @@ function getPlayerSizeFromObject(objVideo) {
   }
   return playerSize;
 }
+let rendererInstance;
 function newRenderer(adUnitCode, rendererOptions = {}) {
-  let isLoaded = window.ozoneVideo;
-  logInfo(`newRenderer will set loaded to ${isLoaded ? 'true' : 'false'}`);
-  const renderer = Renderer.install({
-    url: spec.getRendererUrl(),
-    config: rendererOptions,
-    loaded: isLoaded,
-    adUnitCode
-  });
-  try {
-    renderer.setRender(outstreamRender);
-  } catch (err) {
-    logError('Prebid Error calling renderer.setRender', renderer, err);
+  if (!rendererInstance) {
+    rendererInstance = Renderer.install({
+      url: spec.getRendererUrl(),
+      config: rendererOptions,
+      loaded: false,
+      adUnitCode
+    });
+    try {
+      rendererInstance.setRender(outstreamRender);
+    } catch (err) {
+      logError('Prebid Error calling renderer.setRender', rendererInstance, err);
+    }
+    info('created renderer object');
   }
-  logInfo('returning renderer object');
-  return renderer;
+  return rendererInstance;
 }
 function outstreamRender(bid) {
-  logInfo('outstreamRender got', deepClone(spec.getLoggableBidObject(bid)));
+  info('outstreamRender got', deepClone(bid));
   bid.renderer.push(() => {
-    logInfo('outstreamRender: Going to execute window.ozoneVideo.outstreamRender');
+    info('outstreamRender: Going to execute window.ozoneVideo.outstreamRender');
     window.ozoneVideo.outstreamRender(bid);
   });
 }
 registerBidder(spec);
-logInfo(`*BidAdapter ${OZONEVERSION} was loaded`);
+info(`*BidAdapter ${OZONEVERSION} was loaded`);
