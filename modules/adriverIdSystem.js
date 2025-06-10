@@ -22,6 +22,21 @@ const MODULE_NAME = 'adriverId';
 
 export const storage = getStorageManager({moduleType: MODULE_TYPE_UID, moduleName: MODULE_NAME});
 
+function allowedStorageTypes(config) {
+  if (Array.isArray(config?.enabledStorageTypes)) {
+    return config.enabledStorageTypes;
+  }
+  return config?.storage?.type ? config.storage.type.trim().split(/\s*&\s*/) : [];
+}
+
+function canWriteCookie(config) {
+  return allowedStorageTypes(config).includes('cookie');
+}
+
+function canWriteLocalStorage(config) {
+  return allowedStorageTypes(config).includes('html5');
+}
+
 /** @type {Submodule} */
 export const adriverIdSubmodule = {
   /**
@@ -68,10 +83,18 @@ export const adriverIdSubmodule = {
               }
               let now = new Date();
               now.setTime(now.getTime() + 86400 * 1825 * 1000);
-              storage.setCookie('adrcid', responseObj, now.toUTCString(), 'Lax');
-              storage.setDataInLocalStorage('adrcid', responseObj);
-              storage.setCookie('adrcid_cd', new Date().getTime(), now.toUTCString(), 'Lax');
-              storage.setDataInLocalStorage('adrcid_cd', new Date().getTime());
+              if (canWriteCookie(config)) {
+                storage.setCookie('adrcid', responseObj, now.toUTCString(), 'Lax');
+                storage.setCookie('adrcid_cd', new Date().getTime(), now.toUTCString(), 'Lax');
+              } else {
+                logError(`${MODULE_NAME} module: cookie write blocked by publisher configuration`);
+              }
+              if (canWriteLocalStorage(config)) {
+                storage.setDataInLocalStorage('adrcid', responseObj);
+                storage.setDataInLocalStorage('adrcid_cd', new Date().getTime());
+              } else {
+                logError(`${MODULE_NAME} module: local storage write blocked by publisher configuration`);
+              }
             }
             callback(responseObj);
           },
