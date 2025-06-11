@@ -447,7 +447,6 @@ function testCoverage(done) {
 
 function coveralls() { // 2nd arg is a dependency: 'test' must be finished
   // first send results of istanbul's test coverage to coveralls.io.
-  // Modified by Codex agent to use coveralls-next
   return execaTask('cat build/coverage/lcov.info | node_modules/coveralls-next/bin/coveralls.js')();
 }
 
