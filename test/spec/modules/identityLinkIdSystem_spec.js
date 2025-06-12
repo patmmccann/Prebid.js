@@ -237,6 +237,23 @@ describe('IdentityLinkId tests', function () {
     expect(envelopeValueFromStorage).to.be.eq(testEnvelopeValue);
   })
 
+  it('should respect storage permissions for cookies', function () {
+    const setCookieStub = sinon.stub(storage, 'setCookie');
+    delete window.ats;
+    let callBackSpy = sinon.spy();
+    let submoduleCallback = identityLinkSubmodule.getId({params: {pid: pid}, storage: {type: 'html5'}}).callback;
+    submoduleCallback(callBackSpy);
+    let request = server.requests[0];
+    request.respond(
+      200,
+      responseHeader,
+      JSON.stringify({})
+    );
+    expect(setCookieStub.called).to.be.false;
+    expect(logErrorStub.called).to.be.true;
+    setCookieStub.restore();
+  });
+
   describe('eid', () => {
     before(() => {
       attachIdSystem(identityLinkSubmodule);

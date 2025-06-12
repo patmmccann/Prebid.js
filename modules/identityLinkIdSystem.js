@@ -24,6 +24,17 @@ export const storage = getStorageManager({moduleType: MODULE_TYPE_UID, moduleNam
 
 const liverampEnvelopeName = '_lr_env';
 
+function allowedStorageTypes(config) {
+  if (Array.isArray(config?.enabledStorageTypes)) {
+    return config.enabledStorageTypes;
+  }
+  return config?.storage?.type ? config.storage.type.trim().split(/\s*&\s*/) : [];
+}
+
+function canWriteCookie(config) {
+  return allowedStorageTypes(config).includes('cookie');
+}
+
 /** @type {Submodule} */
 export const identityLinkSubmodule = {
   /**
@@ -79,10 +90,10 @@ export const identityLinkSubmodule = {
         window.ats.retrieveEnvelope(function (envelope) {
           if (envelope) {
             utils.logInfo('identityLink: An envelope can be retrieved from ATS!');
-            setEnvelopeSource(true);
+            setEnvelopeSource(true, config);
             callback(JSON.parse(envelope).envelope);
           } else {
-            getEnvelope(url, callback, configParams);
+            getEnvelope(url, callback, configParams, config);
           }
         });
       } else {
@@ -92,7 +103,7 @@ export const identityLinkSubmodule = {
           utils.logInfo('identityLink: LiveRamp envelope successfully retrieved from storage!');
           callback(JSON.parse(envelope).envelope);
         } else {
-          getEnvelope(url, callback, configParams);
+          getEnvelope(url, callback, configParams, config);
         }
       }
     };
@@ -107,7 +118,7 @@ export const identityLinkSubmodule = {
   }
 };
 // return envelope from third party endpoint
-function getEnvelope(url, callback, configParams) {
+function getEnvelope(url, callback, configParams, config) {
   const callbacks = {
     success: response => {
       let responseObj;
@@ -127,22 +138,30 @@ function getEnvelope(url, callback, configParams) {
   };
 
   if (!configParams.notUse3P && !storage.getCookie('_lr_retry_request')) {
-    setRetryCookie();
+    setRetryCookie(config);
     utils.logInfo('identityLink: A 3P retrieval is attempted!');
-    setEnvelopeSource(false);
+    setEnvelopeSource(false, config);
     ajax(url, callbacks, undefined, { method: 'GET', withCredentials: true });
   } else {
     callback()
   }
 }
 
-function setRetryCookie() {
+function setRetryCookie(config) {
+  if (!canWriteCookie(config)) {
+    utils.logError('identityLink: cookie write blocked by publisher configuration');
+    return;
+  }
   let now = new Date();
   now.setTime(now.getTime() + 3600000);
   storage.setCookie('_lr_retry_request', 'true', now.toUTCString());
 }
 
-function setEnvelopeSource(src) {
+function setEnvelopeSource(src, config) {
+  if (!canWriteCookie(config)) {
+    utils.logError('identityLink: cookie write blocked by publisher configuration');
+    return;
+  }
   let now = new Date();
   now.setTime(now.getTime() + 2592000000);
   storage.setCookie('_lr_env_src_ats', src, now.toUTCString());

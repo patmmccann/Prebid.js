@@ -4,6 +4,7 @@ import sinon from 'sinon';
 import {attachIdSystem} from '../../../modules/userId/index.js';
 import {createEidsArray} from '../../../modules/userId/eids.js';
 import {expect} from 'chai/index.mjs';
+import * as utils from '../../../src/utils.js';
 
 const config = {
   storage: {
@@ -80,4 +81,21 @@ describe('AdqueryIdSystem', function () {
       });
     });
   })
+
+  describe('storage permissions', () => {
+    it('should not write to local storage if disabled', function() {
+      const setLS = sinon.stub(storage, 'setDataInLocalStorage');
+      const logErrorStub = sinon.stub(utils, 'logError');
+      const callbackSpy = sinon.spy();
+      const config = { params: {}, storage: {type: 'cookie'} };
+      const callback = adqueryIdSubmodule.getId(config).callback;
+      callback(callbackSpy);
+      const request = server.requests[0];
+      request.respond(200, { 'Content-Type': 'application/json' }, JSON.stringify({ qid: 'qid_string' }));
+      expect(setLS.called).to.be.false;
+      expect(logErrorStub.calledOnce).to.be.true;
+      setLS.restore();
+      logErrorStub.restore();
+    });
+  });
 });

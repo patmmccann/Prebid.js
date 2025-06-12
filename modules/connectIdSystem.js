@@ -48,13 +48,33 @@ export const storage = getStorageManager({moduleType: MODULE_TYPE_UID, moduleNam
  * @function
  * @param {Object} obj
  */
-function storeObject(obj) {
-  const expires = Date.now() + STORAGE_DURATION;
-  if (storage.cookiesAreEnabled()) {
-    setEtldPlusOneCookie(MODULE_NAME, JSON.stringify(obj), new Date(expires), getSiteHostname());
+function allowedStorageTypes(config) {
+  if (Array.isArray(config?.enabledStorageTypes)) {
+    return config.enabledStorageTypes;
   }
-  if (storage.localStorageIsEnabled()) {
-    storage.setDataInLocalStorage(MODULE_NAME, JSON.stringify(obj));
+  return config?.storage?.type ? config.storage.type.trim().split(/\s*&\s*/) : [];
+}
+
+function storeObject(obj, config) {
+  const expires = Date.now() + STORAGE_DURATION;
+  const types = allowedStorageTypes(config);
+  if (types.includes('cookie')) {
+    if (storage.cookiesAreEnabled()) {
+      setEtldPlusOneCookie(MODULE_NAME, JSON.stringify(obj), new Date(expires), getSiteHostname());
+    } else {
+      logError(`${MODULE_NAME} module: cookie storage blocked`);
+    }
+  } else {
+    logError(`${MODULE_NAME} module: cookie write blocked by publisher configuration`);
+  }
+  if (types.includes('html5')) {
+    if (storage.localStorageIsEnabled()) {
+      storage.setDataInLocalStorage(MODULE_NAME, JSON.stringify(obj));
+    } else {
+      logError(`${MODULE_NAME} module: local storage blocked`);
+    }
+  } else {
+    logError(`${MODULE_NAME} module: local storage write blocked by publisher configuration`);
   }
 }
 
@@ -213,7 +233,7 @@ export const connectIdSubmodule = {
       }
       if (!shouldResync) {
         storedId.lastUsed = Date.now();
-        storeObject(storedId);
+        storeObject(storedId, config);
         return {id: storedId};
       }
     }
@@ -274,7 +294,7 @@ export const connectIdSubmodule = {
                   }
                   responseObj.ttl = validTTLMiliseconds;
                 }
-                storeObject(responseObj);
+                storeObject(responseObj, config);
               } else {
                 logError(`${MODULE_NAME} module: UPS response returned an invalid payload ${response}`);
               }

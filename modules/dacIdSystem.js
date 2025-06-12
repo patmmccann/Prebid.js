@@ -29,6 +29,17 @@ export const API_URL = 'https://penta.a.one.impact-ad.jp/aud';
 const COOKIES_EXPIRES = 60 * 60 * 24 * 1000; // 24h
 const LOG_PREFIX = 'User ID - dacId submodule: ';
 
+function allowedStorageTypes(config) {
+  if (Array.isArray(config?.enabledStorageTypes)) {
+    return config.enabledStorageTypes;
+  }
+  return config?.storage?.type ? config.storage.type.trim().split(/\s*&\s*/) : [];
+}
+
+function canWriteCookie(config) {
+  return allowedStorageTypes(config).includes('cookie');
+}
+
 /**
  * @returns {{fuuid: string, uid: string}} -
  */
@@ -44,16 +55,19 @@ function getCookieId() {
  * @param {string} uid -
  * @returns {void} -
  */
-function setAoneidToCookie(uid) {
-  if (uid) {
-    const expires = new Date(Date.now() + COOKIES_EXPIRES).toUTCString();
-    storage.setCookie(
-      AONEID_COOKIE_NAME,
-      uid,
-      expires,
-      'none'
-    );
+function setAoneidToCookie(uid, config) {
+  if (!uid) return;
+  if (!canWriteCookie(config)) {
+    logError(`${LOG_PREFIX}cookie write blocked by publisher configuration`);
+    return;
   }
+  const expires = new Date(Date.now() + COOKIES_EXPIRES).toUTCString();
+  storage.setCookie(
+    AONEID_COOKIE_NAME,
+    uid,
+    expires,
+    'none'
+  );
 }
 
 /**
@@ -70,7 +84,7 @@ function getApiUrl(oid, fuuid) {
  * @param {string} fuuid -
  * @returns {{callback: function}} -
  */
-function fetchAoneId(oid, fuuid) {
+function fetchAoneId(oid, fuuid, config) {
   return {
     callback: (callback) => {
       const ret = {
@@ -91,7 +105,7 @@ function fetchAoneId(oid, fuuid) {
                 return callback(ret);
               }
               ret.uid = responseObj.uid;
-              setAoneidToCookie(ret.uid);
+              setAoneidToCookie(ret.uid, config);
             } catch (error) {
               logError(LOG_PREFIX + error);
             }
@@ -169,7 +183,7 @@ export const dacIdSystemSubmodule = {
       };
     }
 
-    return fetchAoneId(configParams.oid, cookie.fuuid);
+    return fetchAoneId(configParams.oid, cookie.fuuid, config);
   },
   eids: {
     'dacId': {

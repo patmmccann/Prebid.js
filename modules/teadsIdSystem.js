@@ -23,6 +23,17 @@ const GVL_ID = 132;
 const FP_TEADS_ID_COOKIE_NAME = '_tfpvi';
 const EXPIRED_COOKIE_DATE = 'Thu, 01 Jan 1970 00:00:01 GMT';
 
+function allowedStorageTypes(config) {
+  if (Array.isArray(config?.enabledStorageTypes)) {
+    return config.enabledStorageTypes;
+  }
+  return config?.storage?.type ? config.storage.type.trim().split(/\s*&\s*/) : [];
+}
+
+function canWriteCookie(config) {
+  return allowedStorageTypes(config).includes('cookie');
+}
+
 export const gdprStatus = {
   GDPR_DOESNT_APPLY: 0,
   CMP_NOT_FOUND_OR_ERROR: 22,
@@ -75,10 +86,18 @@ export const teadsIdSubmodule = {
             if (isStr(bodyResponse) && !isEmpty(bodyResponse)) {
               const cookiesMaxAge = getTimestampFromDays(365); // 1 year
               const expirationCookieDate = getCookieExpirationDate(cookiesMaxAge);
-              storage.setCookie(FP_TEADS_ID_COOKIE_NAME, bodyResponse, expirationCookieDate);
+              if (canWriteCookie(submoduleConfig)) {
+                storage.setCookie(FP_TEADS_ID_COOKIE_NAME, bodyResponse, expirationCookieDate);
+              } else {
+                logError(`${MODULE_NAME}: cookie write blocked by publisher configuration`);
+              }
               callback(bodyResponse);
             } else {
-              storage.setCookie(FP_TEADS_ID_COOKIE_NAME, '', EXPIRED_COOKIE_DATE);
+              if (canWriteCookie(submoduleConfig)) {
+                storage.setCookie(FP_TEADS_ID_COOKIE_NAME, '', EXPIRED_COOKIE_DATE);
+              } else {
+                logError(`${MODULE_NAME}: cookie write blocked by publisher configuration`);
+              }
               callback();
             }
           } else {
