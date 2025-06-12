@@ -1,6 +1,6 @@
-import {checkCookieSupport, hasDeviceAccess, logError} from './utils.js';
+import {checkCookieSupport, hasDeviceAccess, logError, logWarn} from './utils.js';
 import {bidderSettings} from './bidderSettings.js';
-import {MODULE_TYPE_BIDDER, MODULE_TYPE_PREBID} from './activities/modules.js';
+import {MODULE_TYPE_BIDDER, MODULE_TYPE_PREBID, MODULE_TYPE_UID} from './activities/modules.js';
 import {isActivityAllowed, registerActivityControl} from './activities/rules.js';
 import {
   ACTIVITY_PARAM_ADAPTER_CODE,
@@ -17,6 +17,14 @@ export const STORAGE_TYPE_LOCALSTORAGE = 'html5';
 export const STORAGE_TYPE_COOKIES = 'cookie';
 
 export let storageCallbacks = [];
+
+let uidStorageConfig = {};
+let uidStorageEnforce = false;
+
+export function setUidStorageEnforcementConfig(map = {}, enforce = false) {
+  uidStorageConfig = {...map};
+  uidStorageEnforce = !!enforce;
+}
 
 /* eslint-disable no-restricted-properties */
 
@@ -208,6 +216,42 @@ export function newStorageManager({moduleName, moduleType} = {}, {isAllowed = is
   }
 }
 
+function uidStorageProxy(manager, moduleName) {
+  function allowed(type, key) {
+    const cfg = uidStorageConfig[moduleName];
+    if (!cfg) return true;
+    const {storageTypes = [], storageName} = cfg;
+    if (!storageTypes.includes(type)) {
+      logWarn(`User ID submodule ${moduleName} attempted to use ${type} storage contrary to configuration`);
+      return !uidStorageEnforce;
+    }
+    if (storageName && key && !(key === storageName || key.startsWith(`${storageName}_`))) {
+      logWarn(`User ID submodule ${moduleName} attempted to write unexpected key ${key}`);
+      return !uidStorageEnforce;
+    }
+    return true;
+  }
+
+  return {
+    ...manager,
+    setCookie(key, value, expires, sameSite, domain, done) {
+      if (allowed(STORAGE_TYPE_COOKIES, key)) {
+        return manager.setCookie(key, value, expires, sameSite, domain, done);
+      }
+    },
+    setDataInLocalStorage(key, value, done) {
+      if (allowed(STORAGE_TYPE_LOCALSTORAGE, key)) {
+        return manager.setDataInLocalStorage(key, value, done);
+      }
+    },
+    removeDataFromLocalStorage(key, done) {
+      if (allowed(STORAGE_TYPE_LOCALSTORAGE, key)) {
+        return manager.removeDataFromLocalStorage(key, done);
+      }
+    }
+  }
+}
+
 /**
  * Get a storage manager for a particular module.
  *
@@ -226,7 +270,11 @@ export function getStorageManager({moduleType, moduleName, bidderCode} = {}) {
   } else if (!moduleName || !moduleType) {
     err()
   }
-  return newStorageManager({moduleType, moduleName});
+  const mgr = newStorageManager({moduleType, moduleName});
+  if (moduleType === MODULE_TYPE_UID) {
+    return uidStorageProxy(mgr, moduleName);
+  }
+  return mgr;
 }
 
 /**

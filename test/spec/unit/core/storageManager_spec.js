@@ -7,12 +7,14 @@ import {
   STORAGE_TYPE_LOCALSTORAGE,
   storageAllowedRule,
   storageCallbacks,
+  getStorageManager,
+  setUidStorageEnforcementConfig
 } from 'src/storageManager.js';
 import adapterManager from 'src/adapterManager.js';
 import {config} from 'src/config.js';
 import * as utils from 'src/utils.js';
 import {hook} from '../../../../src/hook.js';
-import {MODULE_TYPE_BIDDER, MODULE_TYPE_PREBID} from '../../../../src/activities/modules.js';
+import {MODULE_TYPE_BIDDER, MODULE_TYPE_PREBID, MODULE_TYPE_UID} from '../../../../src/activities/modules.js';
 import {ACTIVITY_ACCESS_DEVICE} from '../../../../src/activities/activities.js';
 import {
   ACTIVITY_PARAM_COMPONENT_NAME,
@@ -275,6 +277,34 @@ describe('storage manager', function() {
           });
         });
       });
+    });
+  });
+
+  describe('uid storage type enforcement', () => {
+    let mgr;
+    afterEach(() => {
+      mgr.setCookie('uid', '', 'Thu, 01 Jan 1970 00:00:01 GMT');
+      mgr.removeDataFromLocalStorage('uid');
+      config.resetConfig();
+      sinon.restore();
+    });
+
+    it('warns when writing to disallowed storage', () => {
+      setUidStorageEnforcementConfig({testMod: {storageTypes: ['cookie'], storageName: 'uid'}}, false);
+      sinon.spy(utils, 'logWarn');
+      mgr = getStorageManager({moduleType: MODULE_TYPE_UID, moduleName: 'testMod'});
+      mgr.setDataInLocalStorage('uid', '1');
+      expect(utils.logWarn.called).to.be.true;
+      expect(mgr.getDataFromLocalStorage('uid')).to.equal('1');
+    });
+
+    it('blocks write when enforcement enabled', () => {
+      setUidStorageEnforcementConfig({testMod: {storageTypes: ['cookie'], storageName: 'uid'}}, true);
+      sinon.spy(utils, 'logWarn');
+      mgr = getStorageManager({moduleType: MODULE_TYPE_UID, moduleName: 'testMod'});
+      mgr.setDataInLocalStorage('uid', '1');
+      expect(utils.logWarn.called).to.be.true;
+      expect(mgr.getDataFromLocalStorage('uid')).to.be.null;
     });
   });
 });

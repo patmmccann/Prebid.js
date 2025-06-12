@@ -378,3 +378,25 @@ pbjs.setConfig({
     }
 });
 ```
+
+### Enforcing configured storage type
+
+Set `enforceStorageType` to `true` under `userSync` to prevent ID submodules from
+writing to storage types other than those specified in their configuration. When
+disabled, mismatched writes log a warning but still proceed.
+
+```
+pbjs.setConfig({
+    userSync: {
+        enforceStorageType: true,
+        userIds: [{
+            name: 'pubCommonId',
+            storage: {
+                type: 'html5',
+                name: 'pubcid',
+                expires: 60
+            }
+        }]
+    }
+});
+```

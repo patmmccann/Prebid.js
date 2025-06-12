@@ -127,6 +127,7 @@ import {EID_CONFIG, getEids} from './eids.js';
 import {
   getCoreStorageManager,
   getStorageManager,
+  setUidStorageEnforcementConfig,
   STORAGE_TYPE_COOKIES,
   STORAGE_TYPE_LOCALSTORAGE
 } from '../../src/storageManager.js';
@@ -1141,6 +1142,7 @@ function updateSubmodules() {
   const addedSubmodules = submoduleRegistry.filter(i => !(submodules || []).find(j => j.name === i.name));
 
   submodules.splice(0, submodules.length);
+  const storageMap = {};
   // find submodule and the matching configuration, if found create and append a SubmoduleContainer
   addedSubmodules.map(i => {
     const submoduleConfig = (configs || []).find(j => j.name && (j.name.toLowerCase() === i.name.toLowerCase() ||
@@ -1154,7 +1156,16 @@ function updateSubmodules() {
       storageMgr: getStorageManager({moduleType: MODULE_TYPE_UID, moduleName: submoduleConfig.name}),
     } : null;
   }).filter(submodule => submodule !== null)
-    .forEach((sm) => submodules.push(sm));
+    .forEach((sm) => {
+      submodules.push(sm);
+      storageMap[sm.config.name] = {
+        storageTypes: getConfiguredStorageTypes(sm.config),
+        storageName: sm.config.storage?.name
+      };
+    });
+
+  const {enforceStorageType} = config.getConfig('userSync') || {};
+  setUidStorageEnforcementConfig(storageMap, enforceStorageType);
 
   if (submodules.length) {
     if (!addedStartAuctionHook()) {
