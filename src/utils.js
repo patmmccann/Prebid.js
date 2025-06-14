@@ -1137,9 +1137,13 @@ function mergeDeepHelper(target, source) {
       if (!Array.isArray(target[key])) {
         target[key] = [...val];
       } else {
-        // deduplicate
+        // deduplicate more efficiently by caching seen items
+        // codex agent: improved deduplication performance
+        const seen = new Set(target[key].map(item => safeJSONEncode(item)));
         val.forEach(obj => {
-          if (!target[key].some(item => deepEqual(item, obj))) {
+          const enc = safeJSONEncode(obj);
+          if (!seen.has(enc)) {
+            seen.add(enc);
             target[key].push(obj);
           }
         });

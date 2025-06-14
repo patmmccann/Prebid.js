@@ -1041,6 +1041,13 @@ describe('Utils', function () {
         }
       });
     });
+
+    it('deduplicates array entries when merging', function() {
+      const obj1 = { list: [{ a: 1 }, { a: 2 }] };
+      const obj2 = { list: [{ a: 2 }, { a: 3 }] };
+      const result = utils.mergeDeep({}, obj1, obj2);
+      expect(result).to.deep.equal({ list: [{ a: 1 }, { a: 2 }, { a: 3 }] });
+    });
   });
 
   describe('deepEqual', function() {
