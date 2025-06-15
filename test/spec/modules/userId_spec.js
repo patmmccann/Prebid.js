@@ -403,8 +403,6 @@ describe('User ID', function () {
       }, {adUnits}).then(() => {
         innerAdUnits.forEach((unit) => {
           unit.bids.forEach((bid) => {
-            expect(bid).to.have.deep.nested.property('userId.pubcid');
-            expect(bid.userId.pubcid).to.equal('altpubcid200000');
             expect(bid.userIdAsEids[0]).to.deep.equal({
               source: 'pubcid.org',
               uids: [{id: 'altpubcid200000', atype: 1}]
@@ -1734,11 +1732,9 @@ describe('User ID', function () {
 
           // check ids were copied to bids
           adUnits.forEach(unit => {
-            unit.bids.forEach(bid => {
-              expect(bid).to.have.deep.nested.property('userId.mid');
-              expect(bid.userId.mid).to.equal('1234');
-              expect(bid.userIdAsEids).to.not.exist;// "mid" is an un-known submodule for USER_IDS_CONFIG in eids.js
-            });
+              unit.bids.forEach(bid => {
+                expect(bid.userIdAsEids).to.not.exist;// "mid" is an un-known submodule for USER_IDS_CONFIG in eids.js
+              });
           });
 
           // no sync after auction ends
@@ -1880,14 +1876,12 @@ describe('User ID', function () {
 
         startAuctionHook(function () {
           adUnits.forEach(unit => {
-            unit.bids.forEach(bid => {
-              expect(bid).to.have.deep.nested.property('userId.pubcid');
-              expect(bid.userId.pubcid).to.equal('testpubcid');
-              expect(bid.userIdAsEids[0]).to.deep.equal({
-                source: 'pubcid.org',
-                uids: [{id: 'testpubcid', atype: 1}]
+              unit.bids.forEach(bid => {
+                expect(bid.userIdAsEids[0]).to.deep.equal({
+                  source: 'pubcid.org',
+                  uids: [{id: 'testpubcid', atype: 1}]
+                });
               });
-            });
           });
           coreStorage.setCookie('pubcid', '', EXPIRED_COOKIE_DATE);
           done();
@@ -1905,14 +1899,12 @@ describe('User ID', function () {
 
         startAuctionHook(function () {
           adUnits.forEach(unit => {
-            unit.bids.forEach(bid => {
-              expect(bid).to.have.deep.nested.property('userId.pubcid');
-              expect(bid.userId.pubcid).to.equal('testpubcid');
-              expect(bid.userIdAsEids[0]).to.deep.equal({
-                source: 'pubcid.org',
-                uids: [{id: 'testpubcid', atype: 1}]
+              unit.bids.forEach(bid => {
+                expect(bid.userIdAsEids[0]).to.deep.equal({
+                  source: 'pubcid.org',
+                  uids: [{id: 'testpubcid', atype: 1}]
+                });
               });
-            });
           });
           localStorage.removeItem('pubcid');
           localStorage.removeItem('pubcid_exp');
@@ -2057,32 +2049,6 @@ describe('User ID', function () {
         startAuctionHook(function () {
           adUnits.forEach(unit => {
             unit.bids.forEach(bid => {
-              expect(bid.userId.pubProvidedId).to.deep.equal([{
-                source: 'example.com',
-                uids: [{
-                  id: 'value read from cookie or local storage',
-                  ext: {
-                    stype: 'ppuid'
-                  }
-                }]
-              }, {
-                source: 'id-partner.com',
-                uids: [{
-                  id: 'value read from cookie or local storage',
-                  ext: {
-                    stype: 'dmp'
-                  }
-                }]
-              }, {
-                source: 'provider.com',
-                uids: [{
-                  id: 'value read from cookie or local storage',
-                  ext: {
-                    stype: 'sha256email'
-                  }
-                }]
-              }]);
-
               expect(bid.userIdAsEids[0]).to.deep.equal({
                 source: 'example.com',
                 uids: [{
@@ -2173,28 +2139,6 @@ describe('User ID', function () {
         });
         afterEach(() => {
           isAllowed.restore();
-        });
-
-        it('should check for enrichEids activity permissions', (done) => {
-          isAllowed.callsFake((activity, params) => {
-            return !(activity === ACTIVITY_ENRICH_EIDS &&
-              params[ACTIVITY_PARAM_COMPONENT_TYPE] === MODULE_TYPE_UID &&
-              params[ACTIVITY_PARAM_COMPONENT_NAME] === MOCK_IDS[0])
-          })
-
-          config.setConfig({
-            userSync: {
-              syncDelay: 0,
-              userIds: MOCK_IDS.map(name => ({
-                name, storage: {name, type: 'cookie'}
-              }))
-            }
-          });
-          startAuctionHook((req) => {
-            const activeIds = req.adUnits.flatMap(au => au.bids).flatMap(bid => Object.keys(bid.userId));
-            expect(Array.from(new Set(activeIds))).to.have.members([MOCK_IDS[1]]);
-            done();
-          }, {adUnits})
         });
       })
     });
@@ -3184,10 +3128,10 @@ describe('User ID', function () {
         };
         addIdData({ adUnits, ortb2Fragments });
 
-        adUnits[0].bids.forEach(({userId}) => {
-          const userIdModules = Object.keys(userId);
-          expect(userIdModules).to.include(ALLOWED_MODULE);
-          expect(userIdModules).to.not.include(UNALLOWED_MODULE);
+        adUnits[0].bids.forEach(({userIdAsEids}) => {
+          const sources = (userIdAsEids || []).map(eid => eid.source);
+          expect(sources).to.include(ALLOWED_MODULE + '.com');
+          expect(sources).to.not.include(UNALLOWED_MODULE + '.com');
         });
 
         bidders.forEach((bidderName) => {
