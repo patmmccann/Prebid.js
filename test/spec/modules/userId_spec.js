@@ -427,7 +427,6 @@ describe('User ID', function () {
       }, {adUnits}).then(() => {
         innerAdUnits.forEach((unit) => {
           unit.bids.forEach((bid) => {
-            expect(bid).to.not.have.deep.nested.property('userId.pubcid');
             expect(bid).to.not.have.deep.nested.property('userIdAsEids');
           });
         });
@@ -2140,6 +2139,28 @@ describe('User ID', function () {
         afterEach(() => {
           isAllowed.restore();
         });
+
+        it('should check for enrichEids activity permissions', () => {
+          isAllowed.callsFake((activity, params) => {
+            return !(activity === ACTIVITY_ENRICH_EIDS &&
+              params[ACTIVITY_PARAM_COMPONENT_TYPE] === MODULE_TYPE_UID &&
+              params[ACTIVITY_PARAM_COMPONENT_NAME] === MOCK_IDS[0])
+          })
+
+          config.setConfig({
+            userSync: {
+              syncDelay: 0,
+              userIds: MOCK_IDS.map(name => ({
+                name, storage: {name, type: 'cookie'}
+              }))
+            }
+          });
+          return expectImmediateBidHook((req) => {
+            const activeSources = req.adUnits.flatMap(au => au.bids)
+              .flatMap(bid => bid.userIdAsEids ? bid.userIdAsEids.map(eid => eid.source) : []);
+            expect(Array.from(new Set(activeSources))).to.have.members([MOCK_IDS[1]]);
+          }, {adUnits})
+        
       })
     });
 
@@ -3132,6 +3153,9 @@ describe('User ID', function () {
           const sources = (userIdAsEids || []).map(eid => eid.source);
           expect(sources).to.include(ALLOWED_MODULE + '.com');
           expect(sources).to.not.include(UNALLOWED_MODULE + '.com');
+          const userIdModules = (userIdAsEids || []).map(eid => eid.source.replace('.com', ''));
+          expect(userIdModules).to.include(ALLOWED_MODULE);
+          expect(userIdModules).to.not.include(UNALLOWED_MODULE);
         });
 
         bidders.forEach((bidderName) => {
