@@ -1,5 +1,5 @@
 import mobkoiAnalyticsAdapter, { DEBUG_EVENT_LEVELS, utils, SUB_PAYLOAD_UNIQUE_FIELDS_LOOKUP, SUB_PAYLOAD_TYPES } from 'modules/mobkoiAnalyticsAdapter.js';
-import {internal} from '../../../src/utils.js';
+import * as prebidUtils from '../../../src/utils.js';
 import adapterManager from '../../../src/adapterManager.js';
 import * as events from 'src/events.js';
 import { EVENTS } from 'src/constants.js';
@@ -214,9 +214,13 @@ describe('mobkoiAnalyticsAdapter', function () {
         }
       });
 
-      sandbox.stub(internal, 'logInfo');
-      sandbox.stub(internal, 'logWarn');
-      sandbox.stub(internal, 'logError');
+      sandbox.stub(prebidUtils.internal, 'logInfo');
+      sandbox.stub(prebidUtils.internal, 'logWarn');
+      sandbox.stub(prebidUtils.internal, 'logError');
+
+      sandbox.stub(prebidUtils, 'logInfo');
+      sandbox.stub(prebidUtils, 'logWarn');
+      sandbox.stub(prebidUtils, 'logError');
 
       // Create spies after enabling analytics to ensure localContext exists
       postAjaxStub = sandbox.stub(utils, 'postAjax');
