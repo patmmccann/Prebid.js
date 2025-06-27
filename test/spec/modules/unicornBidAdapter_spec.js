@@ -528,7 +528,7 @@ describe('unicornBidAdapterTest', () => {
       const uid2 = JSON.parse(req2.data)['user']['id'];
       assert.deepStrictEqual(uid, uid2);
     });
-    it('test if contains ID5', () => {
+  it('test if contains ID5', () => {
       let _validBidRequests = utils.deepClone(validBidRequests);
       _validBidRequests[0].userId = {
         id5id: {
@@ -548,8 +548,8 @@ describe('unicornBidAdapterTest', () => {
           ]
         }
       ]
-      assert.deepStrictEqual(reqData, openRTBRequestData);
-    })
+    assert.deepStrictEqual(reqData, openRTBRequestData);
+  })
   });
 
   describe('interpretResponse', () => {
