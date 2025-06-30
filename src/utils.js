@@ -1139,9 +1139,9 @@ function mergeDeepHelper(target, source) {
       } else {
         // deduplicate more efficiently by caching seen items
         // codex agent: improved deduplication performance
-        const seen = new Set(target[key].map(item => safeJSONEncode(item)));
+        const seen = new Set(target[key].map(item => stableJSONEncode(item)));
         val.forEach(obj => {
-          const enc = safeJSONEncode(obj);
+          const enc = stableJSONEncode(obj);
           if (!seen.has(enc)) {
             seen.add(enc);
             target[key].push(obj);
@@ -1209,6 +1209,26 @@ export function safeJSONParse(data) {
 export function safeJSONEncode(data) {
   try {
     return JSON.stringify(data);
+  } catch (e) {
+    return '';
+  }
+}
+
+function sortKeys(value) {
+  if (Array.isArray(value)) {
+    return value.map(sortKeys);
+  } else if (value && typeof value === 'object') {
+    return Object.keys(value).sort().reduce((res, k) => {
+      res[k] = sortKeys(value[k]);
+      return res;
+    }, {});
+  }
+  return value;
+}
+
+export function stableJSONEncode(data) {
+  try {
+    return JSON.stringify(sortKeys(data));
   } catch (e) {
     return '';
   }

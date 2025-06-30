@@ -1048,6 +1048,13 @@ describe('Utils', function () {
       const result = utils.mergeDeep({}, obj1, obj2);
       expect(result).to.deep.equal({ list: [{ a: 1 }, { a: 2 }, { a: 3 }] });
     });
+
+    it('deduplicates objects with different key order', function() {
+      const obj1 = { list: [{ a: 1, b: 2 }] };
+      const obj2 = { list: [{ b: 2, a: 1 }] };
+      const result = utils.mergeDeep({}, obj1, obj2);
+      expect(result).to.deep.equal({ list: [{ a: 1, b: 2 }] });
+    });
   });
 
   describe('deepEqual', function() {
