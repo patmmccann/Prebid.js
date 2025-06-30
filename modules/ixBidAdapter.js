@@ -24,6 +24,17 @@ import { INSTREAM, OUTSTREAM } from '../src/video.js';
 import { Renderer } from '../src/Renderer.js';
 import {getGptSlotInfoForAdUnitCode} from '../libraries/gptUtils/gptUtils.js';
 
+const divIdCache = {};
+
+export function getDivIdFromAdUnitCode(adUnitCode) {
+  if (divIdCache[adUnitCode]) {
+    return divIdCache[adUnitCode];
+  }
+  const divId = document.getElementById(adUnitCode) ? adUnitCode : getGptSlotInfoForAdUnitCode(adUnitCode).divId;
+  divIdCache[adUnitCode] = divId;
+  return divId;
+}
+
 const BIDDER_CODE = 'ix';
 const GLOBAL_VENDOR_ID = 10;
 const SECURE_BID_URL = 'https://htlb.casalemedia.com/openrtb/pbjs';
@@ -997,7 +1008,8 @@ function addImpressions(impressions, impKeys, r, adUnitIndex) {
           _bannerImpression.banner.format[i].ext.bidfloor = bannerImps[i].bidfloor;
         }
 
-        if (JSON.stringify(_bannerImpression.banner.format[i].ext) === '{}') {
+        const formatExt = _bannerImpression.banner.format[i].ext;
+        if (formatExt && Object.keys(formatExt).length === 0) {
           delete _bannerImpression.banner.format[i].ext;
         }
       }
@@ -1187,6 +1199,11 @@ function addFPD(bidderRequest, r, fpd, site, user) {
     const ipv6 = fpd.device.ipv6;
     if (ipv6) {
       deepSetValue(r, 'device.ipv6', ipv6);
+    }
+
+    const geo = fpd.device.geo;
+    if (geo) {
+      deepSetValue(r, 'device.geo', geo);
     }
   }
 
@@ -1385,7 +1402,7 @@ function createNativeImps(validBidRequest, nativeImps) {
     nativeImps[validBidRequest.adUnitCode].tagId = deepAccess(validBidRequest, 'params.tagId');
 
     const adUnitCode = validBidRequest.adUnitCode;
-    const divId = document.getElementById(adUnitCode) ? adUnitCode : getGptSlotInfoForAdUnitCode(adUnitCode).divId;
+    const divId = getDivIdFromAdUnitCode(adUnitCode);
     nativeImps[validBidRequest.adUnitCode].adUnitCode = adUnitCode;
     nativeImps[validBidRequest.adUnitCode].divId = divId;
   }
@@ -1408,7 +1425,7 @@ function createVideoImps(validBidRequest, videoImps) {
     videoImps[validBidRequest.adUnitCode].tagId = deepAccess(validBidRequest, 'params.tagId');
 
     const adUnitCode = validBidRequest.adUnitCode;
-    const divId = document.getElementById(adUnitCode) ? adUnitCode : getGptSlotInfoForAdUnitCode(adUnitCode).divId;
+    const divId = getDivIdFromAdUnitCode(adUnitCode);
     videoImps[validBidRequest.adUnitCode].adUnitCode = adUnitCode;
     videoImps[validBidRequest.adUnitCode].divId = divId;
   }
@@ -1465,7 +1482,7 @@ function createBannerImps(validBidRequest, missingBannerSizes, bannerImps, bidde
   }
 
   const adUnitCode = validBidRequest.adUnitCode;
-  const divId = document.getElementById(adUnitCode) ? adUnitCode : getGptSlotInfoForAdUnitCode(adUnitCode).divId;
+  const divId = getDivIdFromAdUnitCode(adUnitCode);
   bannerImps[validBidRequest.adUnitCode].adUnitCode = adUnitCode;
   bannerImps[validBidRequest.adUnitCode].divId = divId;
 
@@ -1533,7 +1550,7 @@ function createMissingBannerImp(bid, imp, newSize) {
 function outstreamRenderer(bid) {
   bid.renderer.push(function () {
     const adUnitCode = bid.adUnitCode;
-    const divId = document.getElementById(adUnitCode) ? adUnitCode : getGptSlotInfoForAdUnitCode(adUnitCode).divId;
+    const divId = getDivIdFromAdUnitCode(adUnitCode);
     if (!divId) {
       logWarn(`IX Bid Adapter: adUnitCode: ${divId} not found on page.`);
       return;
@@ -1940,7 +1957,7 @@ export function combineImps(imps) {
   const result = {}
   imps.forEach((imp) => {
     Object.keys(imp).forEach((key) => {
-      if (Object.keys(result).includes(key)) {
+      if (result.hasOwnProperty(key)) {
         if (result[key].hasOwnProperty('ixImps') && imp[key].hasOwnProperty('ixImps')) {
           result[key].ixImps = [...result[key].ixImps, ...imp[key].ixImps];
         } else if (result[key].hasOwnProperty('missingImps') && imp[key].hasOwnProperty('missingImps')) {
