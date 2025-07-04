@@ -5,10 +5,11 @@ on:
     branches:
       - master
       - '*-legacy'
-  pull_request:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
 
 concurrency:
-  group: test-${{ github.ref }}
+  group: test-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -32,7 +33,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .
-          key: source-${{ github.sha }}
+          key: source-${{ github.run_id }}
 
   lint:
     name: "Run linter"
@@ -47,7 +48,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .
-          key: source-${{ github.sha }}
+          key: source-${{ github.run_id }}
       - name: lint
         run: npx eslint
       
@@ -79,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     concurrency:
       # see test-chunk.yml for notes on concurrency groups
-      group: browserstack-${{ github.sha }}
+      group: browserstack-${{ github.run_id }}
       cancel-in-progress: false
     env:
       BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USER_NAME }}
@@ -93,7 +94,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .
-          key: source-${{ github.sha }}
+          key: source-${{ github.run_id }}
       - name: Run tests
         uses: nick-fields/retry@v3
         with:
