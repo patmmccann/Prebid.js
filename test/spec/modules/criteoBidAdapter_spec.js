@@ -2145,6 +2145,13 @@ describe('The Criteo bidding adapter', function () {
       expect(bids).to.have.lengthOf(0);
     });
 
+    it('should return an empty array when response body is null', async function () {
+      const bidRequests = [];
+      const request = spec.buildRequests(bidRequests, await addFPDToBidderRequest(bidderRequest));
+      const bids = spec.interpretResponse({body: null}, request);
+      expect(bids).to.have.lengthOf(0);
+    });
+
     it('should return an empty array when parsing a well-formed no bid response', async function () {
       const bidRequests = [];
       const response = {seatbid: []};
