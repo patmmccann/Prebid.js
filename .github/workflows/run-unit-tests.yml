@@ -39,7 +39,8 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .
-          key: source-${{ github.sha }}
+          key: source-${{ github.run_id }}
+          fail-on-cache-miss: true
 
       - name: Build
         run: ${{ inputs.build-cmd }}
@@ -48,7 +49,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .
-          key: build-${{ inputs.build-cmd }}-${{ github.sha }}
+          key: build-${{ inputs.build-cmd }}-${{ github.run_id }}
 
   chunk-1:
     needs: build
@@ -56,7 +57,7 @@ jobs:
     uses: ./.github/workflows/test-chunk.yml
     with:
       chunk-no: 1
-      wdir: build-${{ inputs.build-cmd }}-${{ github.sha }}
+      wdir: build-${{ inputs.build-cmd }}-${{ github.run_id }}
       cmd: ${{ inputs.test-cmd }}
       serialize: ${{ inputs.serialize }}
     secrets:
