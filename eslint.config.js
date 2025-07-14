@@ -3,6 +3,7 @@ const lintImports = require('eslint-plugin-import')
 const neostandard = require('neostandard')
 const globals = require('globals');
 const prebid = require('./plugins/eslint/index.js');
+const chaiFriendly = require('eslint-plugin-chai-friendly');
 const {includeIgnoreFile} = require('@eslint/compat');
 const path = require('path');
 const _ = require('lodash');
@@ -100,6 +101,17 @@ module.exports = [
       semi: 'off',
       'space-before-function-paren': 'off',
       'import/extensions': ['error', 'ignorePackages'],
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: "FunctionDeclaration[id.name=/^log(Message|Info|Warn|Error|Result)$/]",
+          message: "Defining a function named 'logResult, 'logMessage', 'logInfo', 'logWarn', or 'logError' is not allowed."
+        },
+        {
+          selector: "VariableDeclarator[id.name=/^log(Message|Info|Warn|Error|Result)$/][init.type=/FunctionExpression|ArrowFunctionExpression/]",
+          message: "Assigning a function to 'logResult, 'logMessage', 'logInfo', 'logWarn', or 'logError' is not allowed."
+        },
+      ],
 
       // Exceptions below this line are temporary (TM), so that eslint can be added into the CI process.
       // Violations of these styles should be fixed, and the exceptions removed over time.
@@ -220,6 +232,9 @@ module.exports = [
   },
   {
     files: sourcePattern('test'),
+    plugins: {
+      'chai-friendly': chaiFriendly
+    },
     languageOptions: {
       globals: {
         ...globals.mocha,
@@ -228,16 +243,14 @@ module.exports = [
       }
     },
     rules: {
-      // tests were not subject to many rules and they are now a nightmare
       'no-template-curly-in-string': 'off',
       'no-unused-expressions': 'off',
-      'one-var': 'off',
+      'chai-friendly/no-unused-expressions': 'error',
+      // tests were not subject to many rules and they are now a nightmare. rules below this line should be removed over time
       'no-undef': 'off',
       'no-unused-vars': 'off',
-      'import/extensions': 'off',
       'camelcase': 'off',
-      'no-global-assign': 'off',
-      'default-case-last': 'off'
+      'no-global-assign': 'off'
     }
   },
   {
