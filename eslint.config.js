@@ -119,7 +119,6 @@ module.exports = [
       // also see: reality. These are here to stay.
 
       eqeqeq: 'off',
-      'no-return-assign': 'off',
       'no-throw-literal': 'off',
       'no-undef': 2,
       'no-useless-escape': 'off',
@@ -242,6 +241,7 @@ module.exports = [
       'no-unused-expressions': 'off',
       'no-undef': 'off',
       'no-unused-vars': 'off',
+      'no-return-assign': 'off',
       'camelcase': 'off'
     }
   },
