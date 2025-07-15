@@ -2,6 +2,7 @@ import { expect } from 'chai';
 import sinon from 'sinon';
 import { spec, storage } from 'modules/goldbachBidAdapter.js';
 import { newBidder } from 'src/adapters/bidderFactory.js';
+import { getGlobal } from 'src/prebidGlobal.js';
 import { deepClone } from 'src/utils.js';
 import { BANNER, VIDEO, NATIVE } from 'src/mediaTypes.js';
 import { OUTSTREAM } from 'src/video.js';
@@ -410,6 +411,7 @@ describe('GoldbachBidAdapter', function () {
       });
 
       it('should set the player accordingly to config', function () {
+        getGlobal().adUnits = validBidRequests;
         const bidRequest = spec.buildRequests(validBidRequests, validBidderRequest);
         const bidResponse = deepClone({body: validOrtbBidResponse});
         bidResponse.body.seatbid[0].bid[1].adm = '<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?><VAST version=\"4.0\"></VAST>';
