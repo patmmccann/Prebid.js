@@ -21,7 +21,6 @@ const ENDPOINT = 'https://hb.nativery.com/openrtb2/auction';
 const DEFAULT_CURRENCY = 'EUR';
 const TTL = 30;
 const MAX_IMPS_PER_REQUEST = 10;
-const GVLID = 1133;
 
 export const converter = ortbConverter({
   context: {
@@ -41,7 +40,6 @@ export const converter = ortbConverter({
 
 export const spec = {
   code: BIDDER_CODE,
-  gvlid: GVLID,
   aliases: BIDDER_ALIAS,
   supportedMediaTypes: [BANNER, NATIVE, VIDEO],
 

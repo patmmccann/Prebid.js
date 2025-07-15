@@ -11,7 +11,6 @@ import { getStorageManager } from '../src/storageManager.js';
 const IS_LOCAL_MODE = false;
 const BIDDER_CODE = 'goldbach';
 const BIDDER_UID_KEY = 'goldbach_uid';
-const GVLID = 580;
 const URL = 'https://goldlayer-api.prod.gbads.net/openrtb/2.5/auction';
 const URL_LOCAL = 'http://localhost:3000/openrtb/2.5/auction';
 const URL_LOGGING = 'https://l.da-services.ch/pb';
@@ -195,7 +194,6 @@ const sendLog = (data, percentage = 0.0001) => {
 
 export const spec = {
   code: BIDDER_CODE,
-  gvlid: GVLID,
   supportedMediaTypes: [BANNER, VIDEO, NATIVE],
   isBidRequestValid: function (bid) {
     return typeof bid.params?.publisherId === 'string' && bid.params?.publisherId.length > 0;

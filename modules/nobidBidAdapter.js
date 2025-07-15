@@ -14,7 +14,6 @@ import { hasPurpose1Consent } from '../src/utils/gdpr.js';
  * @typedef {import('../src/adapters/bidderFactory.js').validBidRequests} validBidRequests
  */
 
-const GVLID = 816;
 const BIDDER_CODE = 'nobid';
 const storage = getStorageManager({bidderCode: BIDDER_CODE});
 window.nobidVersion = '1.3.4';
@@ -373,7 +372,6 @@ window.addEventListener('message', function (event) {
 }, false);
 export const spec = {
   code: BIDDER_CODE,
-  gvlid: GVLID,
   aliases: [
     { code: 'duration', gvlid: 674 }
   ],

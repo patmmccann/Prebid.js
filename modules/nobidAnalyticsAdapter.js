@@ -14,8 +14,7 @@ const TEST_ALLOCATION_PERCENTAGE = 5; // dont block 5% of the time;
 window.nobidAnalyticsVersion = VERSION;
 const analyticsType = 'endpoint';
 const url = 'localhost:8383/event';
-const GVLID = 816;
-const storage = getStorageManager({gvlid: GVLID, moduleName: MODULE_NAME, moduleType: MODULE_TYPE_ANALYTICS});
+const storage = getStorageManager({moduleName: MODULE_NAME, moduleType: MODULE_TYPE_ANALYTICS});
 const {
   AUCTION_INIT,
   BID_REQUESTED,
@@ -178,7 +177,7 @@ nobidAnalytics = {
 adapterManager.registerAnalyticsAdapter({
   adapter: nobidAnalytics,
   code: 'nobid',
-  gvlid: GVLID
+
 });
 nobidAnalytics.originalAdUnits = {};
 window.nobidCarbonizer = {
