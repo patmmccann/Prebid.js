@@ -29,9 +29,9 @@ import {
   uniques,
 } from './utils.js';
 import {getHighestCpm, getOldestHighestCpmBid} from './utils/reducers.js';
-import type {Bid} from "./bidfactory.ts";
-import type {AdUnitCode, ByAdUnit, Identifier} from "./types/common.d.ts";
-import type {DefaultTargeting} from "./auction.ts";
+import type {Bid} from './bidfactory.ts';
+import type {AdUnitCode, ByAdUnit, Identifier} from './types/common.d.ts';
+import type {DefaultTargeting} from './auction.ts';
 
 var pbTargetingKeys = [];
 
@@ -414,7 +414,7 @@ export function newTargeting(auctionManager) {
     const defaultKeys = Object.keys(TARGETING_KEYS);
     const keyDispositions = {};
     logInfo(`allowTargetingKeys - allowed keys [ ${allowedKeys.map(k => defaultKeyring[k]).join(', ')} ]`);
-    targeting.map(adUnit => {
+    targeting.forEach(adUnit => {
       const adUnitCode = Object.keys(adUnit)[0];
       const keyring = adUnit[adUnitCode];
       const keys = keyring.filter(kvPair => {
