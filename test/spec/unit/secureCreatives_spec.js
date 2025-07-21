@@ -1,4 +1,4 @@
-import {getReplier, receiveMessage, resizeRemoteCreative} from 'src/secureCreatives.js';
+import {getReplier, receiveMessage, resizeRemoteCreative, listenMessagesFromCreative} from 'src/secureCreatives.js';
 import * as utils from 'src/utils.js';
 import {getAdUnits, getBidRequests, getBidResponses} from 'test/fixtures/fixtures.js';
 import {auctionManager} from 'src/auctionManager.js';
@@ -589,5 +589,14 @@ describe('secureCreatives', () => {
       });
       sinon.assert.notCalled(document.getElementById);
     })
+  })
+
+  describe('listenMessagesFromCreative', () => {
+    it('should only add one listener when called multiple times', () => {
+      const stub = sandbox.stub(window, 'addEventListener');
+      listenMessagesFromCreative();
+      listenMessagesFromCreative();
+      sinon.assert.calledOnce(stub);
+    });
   })
 });

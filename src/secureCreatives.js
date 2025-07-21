@@ -29,10 +29,16 @@ if (FEATURES.NATIVE) {
   });
 }
 
+let messageListenerAdded = false;
+function onMessage(ev) {
+  receiveMessage(ev);
+}
+
 export function listenMessagesFromCreative() {
-  window.addEventListener('message', function (ev) {
-    receiveMessage(ev);
-  }, false);
+  if (!messageListenerAdded) {
+    window.addEventListener('message', onMessage, false);
+    messageListenerAdded = true;
+  }
 }
 
 export function getReplier(ev) {
