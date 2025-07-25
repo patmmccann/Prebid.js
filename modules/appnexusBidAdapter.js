@@ -187,7 +187,9 @@ export const spec = {
       appDeviceObj = {};
       Object.keys(appDeviceObjBid.params.app)
         .filter(param => APP_DEVICE_PARAMS.includes(param))
-        .forEach(param => appDeviceObj[param] = appDeviceObjBid.params.app[param]);
+        .forEach(param => {
+          appDeviceObj[param] = appDeviceObjBid.params.app[param];
+        });
     }
 
     const appIdObjBid = ((bidRequests) || []).find(hasAppId);
@@ -1024,6 +1026,7 @@ function bidToTag(bid) {
                   if (v >= 1 && v <= 5) {
                     return v;
                   }
+                  return undefined;
                 }).filter(v => v);
                 tag['video_frameworks'] = apiTmp;
               }
@@ -1207,14 +1210,14 @@ function createAdPodRequest(tags, adPodBid) {
 
     // each configured duration is set as min/maxduration for a subset of requests
     durationRangeSec.forEach((duration, index) => {
-      chunked[index].map(tag => {
+      chunked[index].forEach(tag => {
         setVideoProperty(tag, 'minduration', duration);
         setVideoProperty(tag, 'maxduration', duration);
       });
     });
   } else {
     // all maxdurations should be the same
-    request.map(tag => setVideoProperty(tag, 'maxduration', maxDuration));
+    request.forEach(tag => setVideoProperty(tag, 'maxduration', maxDuration));
   }
 
   return request;
