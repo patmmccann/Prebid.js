@@ -104,11 +104,11 @@ function setMediaTypes(types, bid) {
   if (typeof types === 'object') {
     if (!bid.sizes) {
       bid.dimensions = [];
-      _each(types, (type) =>
+      _each(types, (type) => {
         bid.dimensions = bid.dimensions.concat(
           type.sizes.map(sizeToDimensions)
-        )
-      );
+        );
+      });
     }
     return Object.keys(types).filter(validMediaType);
   }
@@ -306,6 +306,7 @@ function isOWPubmaticBid(adapterName) {
       conf.bidders.indexOf(ADAPTER_CODE) > -1) {
       return true;
     }
+    return false;
   })
 }
 

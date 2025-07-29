@@ -414,7 +414,7 @@ export function newTargeting(auctionManager) {
     const defaultKeys = Object.keys(TARGETING_KEYS);
     const keyDispositions = {};
     logInfo(`allowTargetingKeys - allowed keys [ ${allowedKeys.map(k => defaultKeyring[k]).join(', ')} ]`);
-    targeting.map(adUnit => {
+    targeting.forEach(adUnit => {
       const adUnitCode = Object.keys(adUnit)[0];
       const keyring = adUnit[adUnitCode];
       const keys = keyring.filter(kvPair => {
@@ -519,7 +519,8 @@ export function newTargeting(auctionManager) {
   function convertKeysToQueryForm(keyMap) {
     return Object.keys(keyMap).reduce(function (queryString, key) {
       const encodedKeyPair = `${key}%3d${encodeURIComponent(keyMap[key])}%26`;
-      return queryString += encodedKeyPair;
+      queryString += encodedKeyPair;
+      return queryString;
     }, '');
   }
 
