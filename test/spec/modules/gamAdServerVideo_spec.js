@@ -23,7 +23,7 @@ describe('The DFP video support module', function () {
     hook.ready();
   });
 
-  let sandbox, bid, adUnit;
+  let sandbox, bid, adUnit, serverRequestTimeout;
 
   beforeEach(() => {
     sandbox = sinon.createSandbox();
@@ -38,6 +38,7 @@ describe('The DFP video support module', function () {
   });
 
   afterEach(() => {
+    clearTimeout(serverRequestTimeout);
     sandbox.restore();
   });
 
@@ -776,14 +777,12 @@ describe('The DFP video support module', function () {
 
     server.respond();
 
-    let timeout;
-
     const waitForSecondRequest = () => {
       if (server.requests.length >= 2) {
         server.respond();
-        clearTimeout(timeout);
+        clearTimeout(serverRequestTimeout);
       } else {
-        timeout = setTimeout(waitForSecondRequest, 50);
+        serverRequestTimeout = setTimeout(waitForSecondRequest, 50);
       }
     };
 
