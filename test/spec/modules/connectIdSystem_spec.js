@@ -3,6 +3,7 @@ import {connectIdSubmodule, storage} from 'modules/connectIdSystem.js';
 import {server} from '../../mocks/xhr';
 import {parseQS, parseUrl} from 'src/utils.js';
 import * as refererDetection from '../../../src/refererDetection';
+import * as utils from '../../../src/utils.js';
 
 const TEST_SERVER_URL = 'http://localhost:9876/';
 
@@ -802,6 +803,24 @@ describe('Yahoo ConnectID Submodule', () => {
           expect(setLocalStorageStub.calledOnce).to.be.true;
           expect(setLocalStorageStub.firstCall.args[0]).to.equal(STORAGE_KEY);
           expect(setLocalStorageStub.firstCall.args[1]).to.deep.equal(JSON.stringify(expectedStoredData));
+        });
+
+        it('respects publisher storage settings', () => {
+          const logErrorStub = sinon.stub(utils, 'logError');
+          const config = {
+            he: HASHED_EMAIL,
+            pixelId: PIXEL_ID,
+            storage: {type: 'cookie'}
+          };
+          invokeGetIdAPI(config, consentData);
+          let request = server.requests[0];
+          const upsResponse = {connectid: 'bar'};
+          request.respond(200, {'Content-Type': 'application/json'}, JSON.stringify(upsResponse));
+
+          expect(setCookieStub.calledOnce).to.be.true;
+          expect(setLocalStorageStub.called).to.be.false;
+          expect(logErrorStub.calledOnce).to.be.true;
+          logErrorStub.restore();
         });
       });
     });

@@ -5,6 +5,7 @@ import {
   AONEID_COOKIE_NAME
 } from 'modules/dacIdSystem.js';
 import { server } from 'test/mocks/xhr.js';
+import * as utils from '../../../src/utils.js';
 
 const FUUID_DUMMY_VALUE = 'dacIdTest';
 const AONEID_DUMMY_VALUE = '12345'
@@ -111,6 +112,20 @@ describe('dacId module', function () {
           uid: AONEID_DUMMY_VALUE
         }
       });
+    });
+
+    it('should respect storage permissions for cookies', function () {
+      getCookieStub.withArgs(FUUID_COOKIE_NAME).returns(FUUID_DUMMY_VALUE);
+      const setCookieStub = sinon.stub(storage, 'setCookie');
+      const logErrorStub = sinon.stub(utils, 'logError');
+      const result = dacIdSystemSubmodule.getId({params: {oid: configParamTestCase.params.oid[0]}, storage: {type: 'html5'}});
+      result.callback(() => {});
+      const request = server.requests[0];
+      request.respond(200, { 'Content-Type': 'application/json' }, JSON.stringify({uid: AONEID_DUMMY_VALUE}));
+      expect(setCookieStub.called).to.be.false;
+      expect(logErrorStub.calledOnce).to.be.true;
+      setCookieStub.restore();
+      logErrorStub.restore();
     });
   });
 

@@ -240,7 +240,8 @@ describe('TeadsIdSystem', function () {
 
     it('should save teadsId in cookie and local storage if it was returned by API', function () {
       const config = {
-        params: {}
+        params: {},
+        storage: {type: 'cookie'}
       };
       const result = teadsIdSubmodule.getId(config, {});
       result.callback((id) => {
@@ -257,7 +258,8 @@ describe('TeadsIdSystem', function () {
 
     it('should delete teadsId in cookie and local storage if it was not returned by API', function () {
       const config = {
-        params: {}
+        params: {},
+        storage: {type: 'cookie'}
       };
       const result = teadsIdSubmodule.getId(config, {});
       result.callback((id) => {
@@ -268,6 +270,19 @@ describe('TeadsIdSystem', function () {
       request.respond(200, {'Content-Type': 'application/json'}, '');
 
       expect(setCookieStub.calledWith(FP_TEADS_ID_COOKIE_NAME, '', EXPIRED_COOKIE_DATE)).to.be.true;
+    });
+
+    it('should respect storage configuration', function() {
+      const config = {
+        params: {},
+        storage: {type: 'html5'}
+      };
+      const result = teadsIdSubmodule.getId(config, {});
+      result.callback(() => {});
+      const request = server.requests[0];
+      request.respond(200, {'Content-Type': 'application/json'}, teadsCookieIdSent);
+      expect(setCookieStub.called).to.be.false;
+      expect(logErrorStub.calledOnce).to.be.true;
     });
   });
 });

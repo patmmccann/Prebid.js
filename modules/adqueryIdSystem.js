@@ -22,6 +22,17 @@ const AU_GVLID = 902;
 
 export const storage = getStorageManager({moduleType: MODULE_TYPE_UID, moduleName: 'qid'});
 
+function allowedStorageTypes(config) {
+  if (Array.isArray(config?.enabledStorageTypes)) {
+    return config.enabledStorageTypes;
+  }
+  return config?.storage?.type ? config.storage.type.trim().split(/\s*&\s*/) : [];
+}
+
+function canWriteLocalStorage(config) {
+  return allowedStorageTypes(config).includes('html5');
+}
+
 /**
  * Param or default.
  * @param {String} param
@@ -111,7 +122,11 @@ export const adqueryIdSubmodule = {
           }
           if (responseObj.qid) {
             let myQid = responseObj.qid;
-            storage.setDataInLocalStorage('qid', myQid);
+            if (canWriteLocalStorage(config)) {
+              storage.setDataInLocalStorage('qid', myQid);
+            } else {
+              logError(`${MODULE_NAME} module: local storage write blocked by publisher configuration`);
+            }
             return callback(myQid);
           }
           callback();

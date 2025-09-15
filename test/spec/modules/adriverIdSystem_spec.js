@@ -83,5 +83,16 @@ describe('AdriverIdSystem', function () {
         }
       });
     }));
+
+    it('should respect storage permissions', function () {
+      const config = {params: {}, storage: {type: 'cookie'}};
+      const result = adriverIdSubmodule.getId(config);
+      result.callback(() => {});
+      const request = server.requests[0];
+      request.respond(200, { 'Content-Type': 'application/json' }, JSON.stringify({ adrcid: 'id1' }));
+      expect(setCookieStub.called).to.be.true;
+      expect(setLocalStorageStub.called).to.be.false;
+      expect(logErrorStub.calledWithMatch('local storage write blocked')).to.be.true;
+    });
   });
 });
