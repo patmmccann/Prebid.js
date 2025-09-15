@@ -1273,6 +1273,12 @@ describe('PubMatic adapter', () => {
       expect(bidResponse[0]).to.have.property('creativeId');
     });
 
+    it('should return an empty array when response body is null', () => {
+      const request = spec.buildRequests(validBidRequests, bidderRequest);
+      const bidResponse = spec.interpretResponse({ body: null }, request);
+      expect(bidResponse).to.be.an('array').that.is.empty;
+    });
+
     it('should return response and match with input values', () => {
       const request = spec.buildRequests(validBidRequests, bidderRequest);
       const bidResponse = spec.interpretResponse(response, request);

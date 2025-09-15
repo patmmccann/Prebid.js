@@ -813,6 +813,9 @@ export const spec = {
    * @return {Bid[]} An array of bids which were nested inside the server.
    */
   interpretResponse: (response, request) => {
+    if (!response || response.body == null) {
+      return [];
+    }
     const { bids } = converter.fromORTB({ response: response.body, request: request.data });
     const fledgeAuctionConfigs = deepAccess(response.body, 'ext.fledge_auction_configs');
     if (fledgeAuctionConfigs) {
