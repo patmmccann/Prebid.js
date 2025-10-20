@@ -60,10 +60,17 @@ export function AuctionIndex(getAuctions) {
     },
     getBidRequest({requestId}) {
       if (requestId != null) {
-        return getAuctions()
-          .flatMap(a => a.getBidRequests())
-          .flatMap(ber => ber.bids)
-          .find(br => br && br.bidId === requestId);
+        for (const auction of getAuctions()) {
+          const bidRequests = auction.getBidRequests();
+          for (const bidderRequest of bidRequests) {
+            const bids = Array.isArray(bidderRequest.bids) ? bidderRequest.bids : [];
+            for (const bid of bids) {
+              if (bid && bid.bidId === requestId) {
+                return bid;
+              }
+            }
+          }
+        }
       }
     },
     getOrtb2(bid) {
