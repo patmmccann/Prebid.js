@@ -121,6 +121,7 @@ jobs:
     env:
       BROWSERSTACK_USERNAME: ${{ secrets.BROWSERSTACK_USER_NAME }}
       BROWSERSTACK_ACCESS_KEY: ${{ secrets.BROWSERSTACK_ACCESS_KEY }}
+      BROWSERSTACK_LOCAL_IDENTIFIER: ${{ github.run_id }}
     steps:
       - name: Set up Node.js
         uses: actions/setup-node@v6

@@ -28,7 +28,8 @@ function getCapabilities() {
         osVersion: browser.os_version,
         networkLogs: true,
         consoleLogs: 'verbose',
-        buildName: `Prebidjs E2E (${browser.browser} ${browser.browser_version}) ${new Date().toLocaleString()}`
+        buildName: `Prebidjs E2E (${browser.browser} ${browser.browser_version}) ${new Date().toLocaleString()}`,
+        localIdentifier: process.env.BROWSERSTACK_LOCAL_IDENTIFIER
       },
       acceptInsecureCerts: true,
     });
