@@ -339,7 +339,7 @@ export const intentIqIdSubmodule = {
     );
 
     if (!firstPartyData?.pcid) {
-      const firstPartyId = generateGUID();
+      const firstPartyId = encodeURIComponent(configParams.partnerClientId) || generateGUID();
       firstPartyData = {
         pcid: firstPartyId,
         pcidDate: Date.now(),
