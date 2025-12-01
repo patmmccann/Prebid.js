@@ -7,7 +7,7 @@ import {
   getUserSyncs,
   buildPlacementProcessingFunction
 } from '../libraries/teqblazeUtils/bidderUtils.js';
-import { getTimeZone } from '../src/utils/timezone.js';
+import { getTimeZone } from '../libraries/timezone.js';
 
 const BIDDER_CODE = 'screencore';
 const GVLID = 1473;
