@@ -1,6 +1,11 @@
 const shared = require('./wdio.shared.conf.js');
 const process = require('process');
 
+// Added by Codex agent - disable BrowserStack Accessibility by default
+if (!Object.prototype.hasOwnProperty.call(process.env, 'BROWSERSTACK_ACCESSIBILITY')) {
+  process.env.BROWSERSTACK_ACCESSIBILITY = 'false';
+}
+
 const browsers = Object.fromEntries(
   Object.entries(require('./browsers.json'))
     .filter(([k, v]) => {
