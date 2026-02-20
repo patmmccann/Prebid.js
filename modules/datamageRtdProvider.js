@@ -1,9 +1,6 @@
 import { submodule } from '../src/hook.js';
 import { logError, logWarn, generateUUID } from '../src/utils.js';
 
-// eslint-disable-next-line no-console
-console.log('%c DATAMAGE: Module file loaded successfully ', 'background: #222; color: #bada55');
-
 const MODULE_NAME = 'datamage';
 
 // Cache of latest targeting payload (string scalars + comma-joined lists for legacy use)
