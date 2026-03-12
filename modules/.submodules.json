@@ -90,6 +90,7 @@
       "cleanioRtdProvider",
       "confiantRtdProvider",
       "contxtfulRtdProvider",
+      "datamageRTDProvider",
       "dgkeywordRtdProvider",
       "dynamicAdBoostRtdProvider",
       "experianRtdProvider",
