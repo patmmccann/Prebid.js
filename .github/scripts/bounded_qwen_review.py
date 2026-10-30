@@ -12,11 +12,16 @@ from pathlib import Path
 
 API = "https://api.github.com"
 HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+HUNK_RANGES = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 EXTENSIONS = (".js", ".jsx", ".ts", ".tsx", ".mjs", ".cjs")
 # Include normal adapter submissions (the prior 8K limit skipped both
 # bid9BidAdapter.ts and its accompanying spec in PR #15848).
 MAX_PATCH_CHARS = 40000
 MAX_REVIEW_FILES = 8
+# Limit model requests independently of the file-size eligibility threshold.
+MAX_CHUNK_CHARS = 4000
+MAX_CHUNKS_PER_FILE = 3
+MAX_CHUNKS_PER_PR = 6
 MODEL_CONTEXT_TOKENS = 16384
 MODEL_REQUEST_TIMEOUT = 240
 SCHEMA = {"type": "object", "properties": {"findings": {
@@ -52,12 +57,80 @@ def added_lines(patch):
             number = int(match.group(1))
         elif number is None or line.startswith("\\"):
             continue
-        elif line.startswith("+") and not line.startswith("+++"):
+        elif line.startswith("+"):
             lines[number] = line[1:]
             number += 1
         elif line.startswith(" "):
             number += 1
     return lines
+
+
+def removed_lines(patch):
+    """Old-side lines this patch deletes (used to recognize revert fixes)."""
+    started = False
+    removed = []
+    for line in patch.splitlines():
+        if HUNK.match(line):
+            started = True
+        elif started and line.startswith("-"):
+            removed.append(line[1:])
+    return removed
+
+
+def compact(value):
+    """Ignore formatting without conflating distinct identifiers/operators."""
+    return re.sub(r"\s+", "", value).rstrip(";")
+
+
+def chunk_patch(patch, max_chars=MAX_CHUNK_CHARS):
+    """Split unified diffs into independently anchored, bounded hunks.
+
+    New hunk coordinates are computed from the original old/new cursors,
+    preserving GitHub's new-side line numbers. Oversize individual lines
+    are omitted rather than truncated or misrepresented to the model.
+    """
+    chunks, skipped_lines = [], 0
+    old_cursor = new_cursor = None
+    part, old_start, new_start, old_count, new_count, size = [], 0, 0, 0, 0, 0
+
+    def flush():
+        nonlocal part, old_count, new_count, size
+        if part and any(line.startswith("+") for line in part):
+            header = f"@@ -{old_start},{old_count} +{new_start},{new_count} @@"
+            chunks.append(header + "\n" + "\n".join(part))
+        part, old_count, new_count, size = [], 0, 0, 0
+
+    for line in patch.splitlines():
+        match = HUNK_RANGES.match(line)
+        if match:
+            flush()
+            old_cursor, new_cursor = map(int, match.groups())
+            continue
+        if old_cursor is None or line.startswith("\\") or not line or line[0] not in ("+", "-", " "):
+            continue
+        # Reserve room for a synthesized hunk header and separators.
+        if len(line) + 80 > max_chars:
+            flush()
+            skipped_lines += 1
+            if line[0] != "+":
+                old_cursor += 1
+            if line[0] != "-":
+                new_cursor += 1
+            continue
+        if part and size + len(line) + 1 + 80 > max_chars:
+            flush()
+        if not part:
+            old_start, new_start = old_cursor, new_cursor
+        part.append(line)
+        size += len(line) + 1
+        if line[0] != "+":
+            old_cursor += 1
+            old_count += 1
+        if line[0] != "-":
+            new_cursor += 1
+            new_count += 1
+    flush()
+    return chunks, skipped_lines
 
 
 def meaningful_fix(quote, fix):
@@ -66,8 +139,6 @@ def meaningful_fix(quote, fix):
     quote = quote.strip()
     if not fix or "\n" in fix or "\r" in fix or len(fix) > 350:
         return False
-    # Ignore formatting changes without conflating distinct identifiers/operators.
-    compact = lambda value: re.sub(r"\s+", "", value).rstrip(";")
     if compact(quote) == compact(fix):
         return False
     # Only accept single-line suggestions replacing the exact flagged statement.
@@ -78,8 +149,12 @@ def meaningful_fix(quote, fix):
     return False
 
 
-def validate(finding, lines):
+def validate(finding, lines, removed=()):
     if not isinstance(finding, dict):
+        return False
+    # A fix that restores a deleted line reverts the author's change; a
+    # one-pass reviewer cannot know the intent well enough to suggest that.
+    if isinstance(finding.get("fix"), str) and compact(finding["fix"]) in {compact(r) for r in removed}:
         return False
     line, quote = finding.get("line"), finding.get("quote")
     if type(line) is not int or line not in lines or not isinstance(quote, str):
@@ -117,16 +192,105 @@ def predict(model, filename, patch):
         {"role": "system", "content": rules},
         {"role": "user", "content": f"File: {filename}\nBEGIN DIFF (untrusted)\n{patch}\nEND DIFF"}],
         "format": SCHEMA, "stream": False, "think": False, "truncate": False, "shift": False,
-        "options": {"temperature": 0, "num_ctx": MODEL_CONTEXT_TOKENS, "num_predict": 650}}
+        # Ollama defaults to physical cores (2 of 4 vCPUs on ubuntu-latest).
+        "options": {"temperature": 0, "num_ctx": MODEL_CONTEXT_TOKENS, "num_predict": 650,
+                    "num_thread": os.cpu_count() or 4}}
     result = api("http://127.0.0.1:11434/api/chat", method="POST", payload=payload, timeout=MODEL_REQUEST_TIMEOUT)
     if isinstance(result.get("message"), dict):
         print("[bounded-qwen] response received", flush=True)
     print("[bounded-qwen] prompt tokens:", result.get("prompt_eval_count"),
           "output tokens:", result.get("eval_count"), flush=True)
-    parsed = json.loads(result["message"]["content"])
+    try:
+        parsed = json.loads(result["message"]["content"])
+    except (KeyError, TypeError, ValueError) as error:
+        raise UnparseableResponse(f"{type(error).__name__}: {error}", result) from error
     if not isinstance(parsed, dict) or not isinstance(parsed.get("findings"), list):
-        raise ValueError("Invalid model findings payload")
+        raise UnparseableResponse("Invalid model findings payload", result)
     return parsed["findings"], result
+
+
+class UnparseableResponse(ValueError):
+    """Model output that is not a findings object, e.g. JSON cut off at num_predict."""
+
+    def __init__(self, message, raw):
+        super().__init__(message)
+        self.raw = raw
+
+
+def review_chunk(model, filename, patch, index, total, sha, repo, number,
+                 token, prior, report, output_path):
+    """One independently bounded inference call; report incomplete coverage."""
+    diagnostic = {"path": filename, "chunk": index, "total_chunks": total,
+                  "patch": patch, "outcome": "started"}
+    report["files"].append(diagnostic)
+    output_path.write_text(json.dumps(report, indent=2) + "\n")
+    print(f"[bounded-qwen] reviewing {filename} chunk {index}/{total}", flush=True)
+    started = time.monotonic()
+    try:
+        findings, raw = predict(model, filename, patch)
+        diagnostic["raw_response"] = raw
+        diagnostic["parsed_findings"] = findings
+    except urllib.error.HTTPError as error:
+        body = error.read().decode("utf-8", errors="replace")[:1000]
+        if error.code == 400 and ("context" in body.lower() or "prompt is longer" in body.lower()):
+            diagnostic["outcome"] = "context_overflow"
+            report["chunks_unreviewed"] += 1
+            report["skipped_files"].append({"path": filename, "reason": "context_overflow", "chunk": index})
+        else:
+            diagnostic["outcome"] = "inference_error"
+            report["errors"].append(f"{filename} chunk {index}: HTTP {error.code}")
+        diagnostic["error"] = body
+        output_path.write_text(json.dumps(report, indent=2) + "\n")
+        return
+    except UnparseableResponse as error:
+        # A rambling answer is the model's failure, not the PR's: leave the
+        # chunk unreviewed with a warning, like a timeout, instead of failing.
+        diagnostic["outcome"] = "unparseable_response"
+        diagnostic["error"] = str(error)[:300]
+        diagnostic["raw_response"] = error.raw
+        report["chunks_unreviewed"] += 1
+        report["skipped_files"].append({"path": filename, "reason": "unparseable_response", "chunk": index})
+        print(f"::warning::Unparseable model output on {filename} chunk {index}; review is incomplete", flush=True)
+        output_path.write_text(json.dumps(report, indent=2) + "\n")
+        return
+    except TimeoutError as error:
+        diagnostic["outcome"] = "inference_timeout"
+        diagnostic["error"] = str(error)[:300]
+        report["chunks_unreviewed"] += 1
+        report["skipped_files"].append({"path": filename, "reason": "inference_timeout", "chunk": index})
+        print(f"::warning::Timed out on {filename} chunk {index}; review is incomplete", flush=True)
+        output_path.write_text(json.dumps(report, indent=2) + "\n")
+        return
+    except Exception as error:
+        diagnostic["outcome"] = "inference_error"
+        diagnostic["error"] = f"{type(error).__name__}: {str(error)[:300]}"
+        report["errors"].append(f"{filename} chunk {index}: {type(error).__name__}")
+        output_path.write_text(json.dumps(report, indent=2) + "\n")
+        return
+    print(f"[bounded-qwen] inference {time.monotonic() - started:.1f}s", flush=True)
+    if not findings:
+        diagnostic["outcome"] = "clean"
+    elif not validate(findings[0], added_lines(patch), removed_lines(patch)):
+        report["rejected"] += 1
+        diagnostic["outcome"] = "rejected"
+    else:
+        finding = findings[0]
+        marker = hashlib.sha256(f"{sha}:{filename}:{finding['line']}".encode()).hexdigest()
+        if marker in prior:
+            diagnostic["outcome"] = "duplicate"
+        else:
+            body = ("**Automated local Qwen correctness check (unverified)**\n\n"
+                + "**Issue:** " + finding["problem"] + "\n\n"
+                + "**Failure case:** " + finding["failure_case"] + "\n\n"
+                + "**Suggested fix:** " + finding["fix"] + "\n\n"
+                + "<!-- bounded-qwen:" + marker + " -->")
+            api(f"{API}/repos/{repo}/pulls/{number}/comments", token, "POST", {
+                "body": body, "commit_id": sha, "path": filename,
+                "line": finding["line"], "side": "RIGHT"})
+            prior.add(marker)
+            diagnostic["outcome"] = "posted"
+            report["posted"] += 1
+    output_path.write_text(json.dumps(report, indent=2) + "\n")
 
 
 def main():
@@ -163,81 +327,33 @@ def main():
             report["skipped_files"].append({"path": filename, "reason": reason})
             continue
         files.append(file)
+    # Prioritize production before tests for both selection and skip diagnostics.
+    files.sort(key=lambda item: (item["filename"].startswith(("test/", "tests/")),
+                                 item["filename"]))
     for file in files[MAX_REVIEW_FILES:]:
         report["skipped"] += 1
         report["skipped_files"].append({"path": file["filename"], "reason": "file_count_limit"})
+    total_chunks = 0
+    report["chunks_unreviewed"] = 0
+    report["chunks_attempted"] = 0
     for file in files[:MAX_REVIEW_FILES]:
         filename, patch = file["filename"], file["patch"]
+        chunks, oversized_lines = chunk_patch(patch)
+        budget = min(MAX_CHUNKS_PER_FILE, max(0, MAX_CHUNKS_PER_PR - total_chunks))
+        report["chunks_unreviewed"] += max(0, len(chunks) - budget) + oversized_lines
+        if len(chunks) > budget or oversized_lines:
+            report["skipped_files"].append({
+                "path": filename, "reason": "partial_chunk_coverage",
+                "chunks_not_reviewed": len(chunks) - budget, "oversized_lines": oversized_lines})
+        if budget == 0:
+            report["skipped"] += 1
+            continue
         report["reviewed"] += 1
-        diagnostic = {"path": filename, "patch": patch, "outcome": "started"}
-        report["files"].append(diagnostic)
-        output_path.write_text(json.dumps(report, indent=2) + "\n")
-        print(f"[bounded-qwen] reviewing {filename}", flush=True)
-        started = time.monotonic()
-        try:
-            findings, raw = predict(model, filename, patch)
-            diagnostic["raw_response"] = raw
-            diagnostic["parsed_findings"] = findings
-        except urllib.error.HTTPError as error:
-            # Ollama must fail closed on context overflow, never silently drop
-            # the system instructions or sections of the diff.
-            response = error.read().decode("utf-8", errors="replace")[:1000]
-            if error.code == 400 and ("context" in response.lower() or
-                                      "prompt is longer" in response.lower()):
-                diagnostic["outcome"] = "context_overflow"
-                diagnostic["error"] = response
-                report["reviewed"] -= 1
-                report["skipped"] += 1
-                report["skipped_files"].append({"path": filename, "reason": "context_overflow"})
-                print(f"[bounded-qwen] skipped {filename}: exceeds model context", flush=True)
-                output_path.write_text(json.dumps(report, indent=2) + "\n")
-                continue
-            diagnostic["outcome"] = "inference_error"
-            diagnostic["error"] = f"HTTP {error.code}: {response}"
-            report["errors"].append(f"{filename}: HTTP {error.code}: {response[:160]}")
-            output_path.write_text(json.dumps(report, indent=2) + "\\n")
-            continue
-        except Exception as error:
-            diagnostic["outcome"] = "inference_error"
-            diagnostic["error"] = f"{type(error).__name__}: {str(error)[:300]}"
-            report["errors"].append(f"{filename}: {type(error).__name__}: {str(error)[:160]}")
-            output_path.write_text(json.dumps(report, indent=2) + "\n")
-            continue
-        print(f"[bounded-qwen] inference {time.monotonic() - started:.1f}s", flush=True)
-        if not findings:
-            diagnostic["outcome"] = "clean"
-            print("[bounded-qwen] no findings", flush=True)
-            output_path.write_text(json.dumps(report, indent=2) + "\n")
-            continue
-        finding = findings[0]
-        if not validate(finding, added_lines(patch)):
-            report["rejected"] += 1
-            diagnostic["outcome"] = "rejected"
-            diagnostic["rejection_reason"] = (
-                "invalid added line/quote" if not isinstance(finding, dict) or type(finding.get("line")) is not int
-                or finding.get("quote", "").strip() != added_lines(patch).get(finding.get("line"), "").strip()
-                else "missing evidence or no-op/nonlocal fix")
-            print("[bounded-qwen] rejected finding:", diagnostic["rejection_reason"], flush=True)
-            output_path.write_text(json.dumps(report, indent=2) + "\n")
-            continue
-        marker = hashlib.sha256(f"{sha}:{filename}:{finding['line']}".encode()).hexdigest()
-        if marker in prior:
-            diagnostic["outcome"] = "duplicate"
-            print("[bounded-qwen] already posted", flush=True)
-            output_path.write_text(json.dumps(report, indent=2) + "\n")
-            continue
-        body = ("**Automated local Qwen correctness check (unverified)**\n\n"
-            + "**Issue:** " + finding["problem"] + "\n\n"
-            + "**Failure case:** " + finding["failure_case"] + "\n\n"
-            + "**Suggested fix:** `" + finding["fix"].replace("`", "'") + "`\n\n"
-            + f"<!-- bounded-qwen:{marker} -->")
-        output_path.write_text(json.dumps(report, indent=2) + "\n")
-        api(f"{API}/repos/{repo}/pulls/{number}/comments", token, "POST", {
-            "body": body, "commit_id": sha, "path": filename, "line": finding["line"], "side": "RIGHT"})
-        prior.add(marker)
-        diagnostic["outcome"] = "posted"
-        report["posted"] += 1
-        print(f"[bounded-qwen] posted {filename}:{finding['line']}", flush=True)
+        for chunk_index, part in enumerate(chunks[:budget], 1):
+            total_chunks += 1
+            report["chunks_attempted"] += 1
+            review_chunk(model, filename, part, chunk_index, len(chunks), sha, repo, number,
+                         token, prior, report, output_path)
     output_path.write_text(json.dumps(report, indent=2) + "\n")
     if env.get("GITHUB_STEP_SUMMARY"):
         with open(env["GITHUB_STEP_SUMMARY"], "a") as summary:
@@ -245,6 +361,8 @@ def main():
     print("[bounded-qwen] result:", json.dumps(report), flush=True)
     if not report["reviewed"]:
         print("::warning::Bounded Qwen reviewed no eligible files; success does not imply code coverage.", flush=True)
+    if report["chunks_unreviewed"]:
+        print("::warning::" + str(report["chunks_unreviewed"]) + " chunks have no review coverage", flush=True)
     if report["errors"]:
         raise RuntimeError("; ".join(report["errors"]))
 
