@@ -107,13 +107,13 @@ describe('Missena Adapter', function () {
 
     it('should return false if the apiKey is missing', function () {
       expect(
-        spec.isBidRequestValid({ ...bid, params: {} }),
+        spec.isBidRequestValid(Object.assign(bid, { params: {} })),
       ).to.equal(false);
     });
 
     it('should return false if the apiKey is an empty string', function () {
       expect(
-        spec.isBidRequestValid({ ...bid, params: { ...bid.params, apiKey: '' } }),
+        spec.isBidRequestValid(Object.assign(bid, { params: { apiKey: '' } })),
       ).to.equal(false);
     });
   });
@@ -322,6 +322,9 @@ describe('Missena Adapter', function () {
 
     it('should send the prebid version', function () {
       expect(payload.version).to.equal('prebid.js@$prebid.version$');
+    });
+
+    it('should send cookie deprecation', function () {
     });
   });
 
