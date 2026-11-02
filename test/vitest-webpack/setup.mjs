@@ -19,7 +19,7 @@ globalThis.should = chai.should();
 globalThis.sinon = sinon;
 
 // test_deps.js wraps `window.__karma__.loaded`
-globalThis.__karma__ = {loaded() {}};
+globalThis.__karma__ = { loaded() {} };
 
 // The tester page is test/vitest-webpack/context.html, shaped like karma's: Vitest's own is
 // `<html lang="en">` (FPD enrichment turns that into site.content.language) titled "Vitest Browser Tester".
@@ -28,17 +28,17 @@ globalThis.__karma__ = {loaded() {}};
 if (globalThis.__VITEST_KARMA_URL__ !== false) {
   history.replaceState(history.state, '', '/context.html');
   if (window.top !== window) {
-    // karma's top page is http://localhost:9876/ (what refererDetection reports as the page)
-    window.top.history.replaceState(window.top.history.state, '', '/');
+    // karma's top page is http://localhost:9876/?id=<browser id> (karma-chrome-launcher)
+    window.top.history.replaceState(window.top.history.state, '', '/?id=73195742');
   }
-  Object.defineProperty(document, 'referrer', {value: `${location.origin}/`, configurable: true});
+  Object.defineProperty(document, 'referrer', { value: `${location.origin}/`, configurable: true });
 }
 
 // ---- Mocha BDD interface on top of Vitest -------------------------------------------------------
 
 // A Mocha `Context`: tests and hooks of a suite share it (prototypally inherited from the parent suite),
 // so `this.foo = ...` in a hook is visible in the tests.
-const rootSuite = {title: '', parent: null, timeout: DEFAULT_TIMEOUT, retries: 0, ctx: {}};
+const rootSuite = { title: '', parent: null, timeout: DEFAULT_TIMEOUT, retries: 0, ctx: {} };
 rootSuite.ctx = makeCtx(null);
 let currentSuite = rootSuite;
 // Mocha silently ignores it()/hooks declared while a test or hook is running (they're added to a suite
@@ -56,8 +56,8 @@ function makeCtx(parent) {
       },
       writable: true
     },
-    slow: {value() { return this; }, writable: true},
-    retries: {value() { return this; }, writable: true},
+    slow: { value() { return this; }, writable: true },
+    retries: { value() { return this; }, writable: true },
     skip: {
       value() {
         if (this.vctx?.skip) return this.vctx.skip();
@@ -87,8 +87,8 @@ function suiteThis(suite) {
 function testInfo(task, ctx) {
   const parentOf = (t) => {
     const s = t?.suite;
-    if (!s || s.type !== 'suite' || s.filepath) return {title: '', parent: null, root: true, fullTitle: () => ''};
-    return {title: s.name, parent: parentOf(s), fullTitle() { const p = this.parent.fullTitle(); return p ? `${p} ${this.title}` : this.title; }};
+    if (!s || s.type !== 'suite' || s.filepath) return { title: '', parent: null, root: true, fullTitle: () => '' };
+    return { title: s.name, parent: parentOf(s), fullTitle() { const p = this.parent.fullTitle(); return p ? `${p} ${this.title}` : this.title; } };
   };
   const parent = parentOf(task);
   return {
@@ -124,7 +124,7 @@ function run(fn, opts) {
   return runNow(fn, opts);
 }
 
-function runNow(fn, {suite, timeout, title, vctx, test, kind}) {
+function runNow(fn, { suite, timeout, title, vctx, test, kind }) {
   const ctx = suite.ctx;
   return new Promise((resolve, reject) => {
     let timer;
@@ -158,11 +158,11 @@ function runNow(fn, {suite, timeout, title, vctx, test, kind}) {
         resolve();
       }
     }
-    const prev = {runnable: ctx.runnable};
+    const prev = { runnable: ctx.runnable };
     running++;
     ctx.runnable = runnable;
     ctx.vctx = vctx;
-    ctx.test = test ?? (vctx?.task ? testInfo(vctx.task, ctx) : {title, ctx});
+    ctx.test = test ?? (vctx?.task ? testInfo(vctx.task, ctx) : { title, ctx });
     if (kind === 'test') ctx.currentTest = ctx.test;
     arm();
     try {
@@ -202,7 +202,7 @@ function wrapDescribe(vDescribe) {
     if (running) return ignoredWhileRunning('describe', title, fn);
     if (typeof fn !== 'function') return vDescribe(title);
     const parent = currentSuite;
-    const suite = {title, parent, timeout: parent.timeout, retries: parent.retries, ctx: makeCtx(parent.ctx)};
+    const suite = { title, parent, timeout: parent.timeout, retries: parent.retries, ctx: makeCtx(parent.ctx) };
     return vDescribe(String(title), function () {
       currentSuite = suite;
       try {
@@ -221,15 +221,15 @@ function wrapIt(vIt) {
     if (typeof fn !== 'function') return vitest.it.skip(String(title), () => {});
     const suite = currentSuite;
     const timeout = suite.timeout;
-    const opts = {timeout: NO_TIMEOUT, ...(suite.retries ? {retry: suite.retries} : {})};
-    return vIt(String(title), opts, (vctx) => run(fn, {suite, timeout, title, vctx, kind: "test"}));
+    const opts = { timeout: NO_TIMEOUT, ...(suite.retries ? { retry: suite.retries } : {}) };
+    return vIt(String(title), opts, (vctx) => run(fn, { suite, timeout, title, vctx, kind: "test" }));
   };
 }
 
 function ignoredWhileRunning(kind, title, fn) {
   // eslint-disable-next-line no-console
   console.warn(`[mocha shim] ${kind}('${title}') called inside a running test or hook; ignored, as Mocha does`);
-  if (kind === 'describe' && typeof fn === 'function') fn.call(suiteThis({title, timeout: currentSuite.timeout, retries: 0, ctx: makeCtx(currentSuite.ctx)}));
+  if (kind === 'describe' && typeof fn === 'function') fn.call(suiteThis({ title, timeout: currentSuite.timeout, retries: 0, ctx: makeCtx(currentSuite.ctx) }));
 }
 
 function hookArgs(args) {
@@ -245,7 +245,7 @@ function wrapEachHook(vHook, setsCurrentTest) {
     const timeout = suite.timeout;
     vHook((vctx) => {
       if (setsCurrentTest) suite.ctx.currentTest = testInfo(vctx.task, suite.ctx);
-      return run(fn, {suite, timeout, title: `"${vHook.name}" hook`, vctx, kind: 'hook'});
+      return run(fn, { suite, timeout, title: `"${vHook.name}" hook`, vctx, kind: 'hook' });
     }, NO_TIMEOUT);
   };
 }
@@ -256,7 +256,7 @@ function wrapAllHook(vHook) {
     const fn = hookArgs(args);
     const suite = currentSuite;
     const timeout = suite.timeout;
-    vHook(() => run(fn, {suite, timeout, title: `"${vHook.name}" hook`, kind: 'hook'}), NO_TIMEOUT);
+    vHook(() => run(fn, { suite, timeout, title: `"${vHook.name}" hook`, kind: 'hook' }), NO_TIMEOUT);
   };
 }
 

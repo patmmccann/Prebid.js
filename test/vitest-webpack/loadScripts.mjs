@@ -12,7 +12,7 @@ export async function loadScripts(urls) {
       };
       const done = (err) => {
         window.removeEventListener('error', onError);
-        err ? reject(err) : resolve();
+        if (err) reject(err); else resolve();
       };
       window.addEventListener('error', onError);
       script.onload = () => done(error);

@@ -1,8 +1,10 @@
 // Spike: Vitest Browser Mode as the runner for bundles produced by Karma's webpack config.
-// Build them first: `node test/vitest-webpack/build.cjs` (see the env vars documented there).
-import {fileURLToPath} from 'node:url';
-import {defineConfig} from 'vitest/config';
-import {playwright} from '@vitest/browser-playwright';
+// Build them first: `node test/vitest-webpack/build.cjs` (env vars documented there; needs `npx gulp precompile`),
+// then `npx vitest run --config test/vitest-webpack/vitest.config.mjs`. Spike deps (not in package.json):
+// `npm install --no-save vitest @vitest/browser-playwright playwright && npx playwright install chromium`.
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vitest/config';
+import { playwright } from '@vitest/browser-playwright';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -20,12 +22,12 @@ export default defineConfig({
   },
   test: {
     // the browser-mode server listens here: karma's port, which many specs hard-code (see setup.mjs)
-    api: {port: 9876, strictPort: true},
+    api: { port: 9876, strictPort: true },
     include: ['build/vitest-bundles/**/*_spec.js'],
     setupFiles: ['test/vitest-webpack/setup.mjs'],
     globals: false,
     // Mocha runs after/afterEach hooks in registration order
-    sequence: {hooks: 'list'},
+    sequence: { hooks: 'list' },
     // timeouts are enforced by the Mocha shim in setup.mjs (default 3000ms, honoring this.timeout())
     testTimeout: 0,
     hookTimeout: 0,
@@ -37,11 +39,11 @@ export default defineConfig({
       enabled: true,
       headless: true,
       // VITEST_CHANNEL=chrome runs the installed Google Chrome (what karma launches) instead of Playwright's Chromium
-      provider: playwright(process.env.VITEST_CHANNEL ? {launchOptions: {channel: process.env.VITEST_CHANNEL}} : {}),
-      instances: [{browser: 'chromium'}],
+      provider: playwright(process.env.VITEST_CHANNEL ? { launchOptions: { channel: process.env.VITEST_CHANNEL } } : {}),
+      instances: [{ browser: 'chromium' }],
       screenshotFailures: false,
       // karma's ChromeHeadless window size (Vitest defaults to a 414x896 phone viewport)
-      viewport: {width: 800, height: 600},
+      viewport: { width: 800, height: 600 },
       // a page shaped like karma's context.html (no lang attribute, empty title)
       testerHtmlPath: 'test/vitest-webpack/context.html',
     },
