@@ -1,7 +1,11 @@
-// Spike: build Karma's test bundles with Karma's own webpack/Babel configuration, but emit them as
-// ES modules - one self-contained bundle per spec file - so Vitest Browser Mode can run them as test
-// files. Nothing is re-transformed by Vite except trivial import analysis; module exports stay the
-// plain CommonJS objects that `sinon.stub(namespace, 'fn')` relies on.
+// Spike: build Karma's test bundles with Karma's own webpack/Babel configuration - one entry per spec
+// file - and give Vitest Browser Mode a tiny ES module per spec that loads them as classic scripts.
+// Vite never transforms the bundles (they're served from publicDir); module exports stay the plain
+// CommonJS objects that `sinon.stub(namespace, 'fn')` relies on.
+//
+// Classic scripts, not ES module output: an ES module is strict mode as a whole, and webpack would put
+// every bundled module in it - including sloppy-mode CommonJS from node_modules (e.g. dset), where
+// assigning to a getter-only property is silently ignored under karma but throws in strict mode.
 //
 // Environment (mirrors karmaRunner.js):
 //   VITEST_FILES   comma separated spec paths (like `gulp test-only --file`); no pipeline_setup, like Karma
@@ -20,7 +24,11 @@ const karmaConfMaker = require('../../karma.conf.maker.js');
 const helpers = require('../../gulpHelpers.js');
 
 const ROOT = path.resolve(__dirname, '../..');
+// the test files Vitest collects (one small ES module per spec)
 const OUT = path.resolve(ROOT, 'build/vitest-bundles');
+// Vite's publicDir (see vitest.config.mjs): served as-is at /wp/...
+const PUBLIC = path.resolve(ROOT, 'build/vitest-public');
+const SCRIPTS = path.join(PUBLIC, 'wp');
 
 function selectSpecs() {
   if (process.env.VITEST_FILES) {
@@ -56,22 +64,32 @@ function makeConfig({specs, pipeline}) {
     return [name, [...pre, spec, ...post].map(f => helpers.getPrecompiledPath(f))];
   }));
   config.devtool = process.env.VITEST_SOURCEMAPS ? 'inline-source-map' : false;
-  config.experiments = {...(config.experiments || {}), outputModule: true};
   config.output = {
     ...config.output,
-    path: OUT,
+    path: SCRIPTS,
     filename: '[name].js',
     chunkFilename: '_chunks/[id].js',
-    module: true,
-    chunkFormat: 'module',
-    chunkLoading: 'import',
-    globalObject: 'self',
     clean: true,
   };
-  delete config.output.chunkLoadingGlobal;
-  // self-contained bundles: each spec file is its own module graph, so nothing is shared between
-  // the files of a chunk the way karma's single runtime shares it (see report)
-  config.optimization = {splitChunks: false, runtimeChunk: false, minimize: false};
+  // Every spec file still gets its own module instances - Vitest gives each test file a fresh iframe,
+  // so the runtime and shared chunks are evaluated once per file, unlike karma's single page - but the
+  // shared *code* lives in one file the browser downloads once and caches.
+  // VITEST_SPLIT=0 emits fully self-contained bundles instead.
+  config.optimization = process.env.VITEST_SPLIT === '0'
+    ? {splitChunks: false, runtimeChunk: false, minimize: false}
+    : {
+      minimize: false,
+      runtimeChunk: {name: '_chunks/runtime'},
+      splitChunks: {
+        chunks: 'all',
+        minSize: 0,
+        cacheGroups: {
+          default: false,
+          defaultVendors: false,
+          commons: {name: '_chunks/commons', chunks: 'all', minChunks: Number(process.env.VITEST_SPLIT_MIN ?? 2)},
+        },
+      },
+    };
   config.cache = {
     type: 'filesystem',
     cacheDirectory: path.resolve(ROOT, '.cache/webpack-vitest'),
@@ -109,6 +127,17 @@ webpack(makeConfig(selection), (err, stats) => {
     info.errors.forEach(e => console.error(e.message));
     process.exit(1);
   }
+  // one test file per spec: load its entrypoint's scripts (runtime, shared chunk, entry) in order
+  fs.rmSync(OUT, {recursive: true, force: true});
+  const {entrypoints} = stats.toJson({all: false, entrypoints: true});
+  Object.entries(entrypoints).forEach(([name, {assets}]) => {
+    const urls = assets.map(a => '/wp/' + (typeof a === 'string' ? a : a.name));
+    const file = path.join(OUT, name + '.js');
+    fs.mkdirSync(path.dirname(file), {recursive: true});
+    fs.writeFileSync(file, `import {loadScripts} from '/test/vitest-webpack/loadScripts.mjs';
+await loadScripts(${JSON.stringify(urls)});
+`);
+  });
   fs.writeFileSync(path.join(OUT, 'specs.json'), JSON.stringify(selection.specs, null, 2));
   console.log(`built ${selection.specs.length} spec bundle(s) into ${path.relative(ROOT, OUT)} in ${((Date.now() - started) / 1000).toFixed(1)}s`);
 });
