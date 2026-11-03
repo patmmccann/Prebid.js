@@ -1,0 +1,151 @@
+name: Vitest benchmark (fork only, #16009)
+
+# Benchmarks Karma and the webpack-backed Vitest runner on clean GitHub runners. Each job is one
+# scenario from test/vitest-webpack/bench/scenarios.sh; every step is timed by measure.sh, and the job
+# summary has the table. Repeated across `rep` so that runner variance shows.
+on:
+  push:
+    branches: ['bench/vitest-perf-16009*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    name: ${{ matrix.scenario }} (rep ${{ matrix.rep }})
+    strategy:
+      fail-fast: false
+      matrix:
+        scenario: [karma, karma-coverage, vitest, par2, par3, par4, chrome, nosplit, chunks4, chunks16, isolate, nodeps]
+        rep: [1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      BENCH_OUT: ${{ github.workspace }}/build/bench
+      BENCH_SCENARIO: ${{ matrix.scenario }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+      - name: Runner info
+        run: |
+          nproc; free -m; df -h . | tail -1; google-chrome --version || true; cat /etc/os-release | head -2
+      - name: npm ci
+        run: test/vitest-webpack/bench/measure.sh setup-npm-ci npm ci
+      - name: Install browser
+        if: ${{ !startsWith(matrix.scenario, 'karma') && matrix.scenario != 'chrome' }}
+        run: |
+          if [ "${{ matrix.scenario }}" = nodeps ]; then
+            test/vitest-webpack/bench/measure.sh setup-playwright-nodeps npx playwright install chromium
+          else
+            test/vitest-webpack/bench/measure.sh setup-playwright npx playwright install --with-deps chromium
+          fi
+      - name: Precompile
+        run: |
+          test/vitest-webpack/bench/measure.sh precompile-cold npx gulp precompile
+          if [ "${{ matrix.scenario }}" = vitest ]; then
+            test/vitest-webpack/bench/measure.sh precompile-warm npx gulp precompile
+          fi
+      - name: Scenario
+        run: test/vitest-webpack/bench/scenarios.sh ${{ matrix.scenario }}
+      - name: Summary
+        if: always()
+        run: node test/vitest-webpack/bench/summarize.js >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-${{ matrix.scenario }}-${{ matrix.rep }}
+          path: build/bench
+
+  # A re-run with the content-addressed caches restored: what a second push to a PR would see.
+  cache-seed:
+    name: cache seed
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      BENCH_OUT: ${{ github.workspace }}/build/bench
+      BENCH_SCENARIO: cache-seed
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci
+      - run: |
+          test/vitest-webpack/bench/measure.sh precompile-cold npx gulp precompile
+          test/vitest-webpack/bench/measure.sh build-cold node test/vitest-webpack/build.js
+          du -sh .cache/*
+      - uses: actions/cache/save@v5
+        with:
+          path: |
+            .cache/precompile
+            .cache/ts
+            .cache/babel-loader
+          key: bench-babel-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: actions/cache/save@v5
+        with:
+          path: .cache/webpack-vitest
+          key: bench-webpack-${{ github.run_id }}-${{ github.run_attempt }}
+
+  cache-use:
+    name: cache use ${{ matrix.caches }} (rep ${{ matrix.rep }})
+    needs: cache-seed
+    strategy:
+      fail-fast: false
+      matrix:
+        caches: [babel, babel+webpack]
+        rep: [1, 2, 3]
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      BENCH_OUT: ${{ github.workspace }}/build/bench
+      BENCH_SCENARIO: cache-${{ matrix.caches }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: '.nvmrc'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Restore precompile/babel caches
+        id: t0
+        run: echo "t=$(date +%s%3N)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache/restore@v5
+        with:
+          path: |
+            .cache/precompile
+            .cache/ts
+            .cache/babel-loader
+          key: bench-babel-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: true
+      - uses: actions/cache/restore@v5
+        if: ${{ matrix.caches == 'babel+webpack' }}
+        with:
+          path: .cache/webpack-vitest
+          key: bench-webpack-${{ github.run_id }}-${{ github.run_attempt }}
+          fail-on-cache-miss: true
+      - name: Record restore time
+        run: |
+          mkdir -p "$BENCH_OUT"; t1=$(date +%s%3N)
+          echo "{\"label\":\"cache-restore\",\"wall\":$(awk -v a=${{ steps.t0.outputs.t }} -v b=$t1 'BEGIN{printf "%.1f",(b-a)/1000}'),\"status\":0,\"cpuBusyPct\":0,\"memBaseMB\":0,\"memPeakMB\":0,\"t0\":${{ steps.t0.outputs.t }},\"t1\":$t1}" >> "$BENCH_OUT/results.jsonl"
+          du -sh .cache/*
+      - run: |
+          test/vitest-webpack/bench/measure.sh precompile-cached npx gulp precompile
+          test/vitest-webpack/bench/measure.sh build-cached node test/vitest-webpack/build.js
+          test/vitest-webpack/bench/measure.sh run-1 npx vitest run --config test/vitest-webpack/vitest.config.mjs --reporter=default --reporter=json --outputFile.json="$BENCH_OUT/run-1.json"
+      - name: Summary
+        if: always()
+        run: node test/vitest-webpack/bench/summarize.js >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: bench-cache-${{ matrix.caches == 'babel' && 'babel' || 'all' }}-${{ matrix.rep }}
+          path: build/bench
