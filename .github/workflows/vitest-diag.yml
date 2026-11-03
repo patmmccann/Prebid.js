@@ -9,15 +9,8 @@ permissions:
   contents: read
 jobs:
   diag:
-    name: Diag ${{ matrix.browser }} ${{ matrix.os }} (${{ matrix.set }}, persistent=${{ matrix.persistent }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [macos-latest]
-        browser: [webkit]
-        set: [probe, chunk7]
-        persistent: ["", "/tmp/pw-profile"]
-    runs-on: ${{ matrix.os }}
+    name: Diag webkit macos (sequential)
+    runs-on: macos-latest
     timeout-minutes: 240
     defaults:
       run:
@@ -30,19 +23,21 @@ jobs:
         with:
           node-version-file: '.nvmrc'
       - run: npm ci
-      - run: npx playwright install --with-deps ${{ matrix.browser }}
-      - run: npx playwright --version
+      - run: npx playwright install --with-deps webkit
       - run: npx gulp precompile
-      - name: Run
+      - name: Probe, ephemeral context
         env:
-          VITEST_BROWSER: ${{ matrix.browser }}
-          VITEST_PERSISTENT: ${{ matrix.persistent }}
+          VITEST_BROWSER: webkit
+        run: VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
+      - name: Probe, persistent context
+        env:
+          VITEST_BROWSER: webkit
+          VITEST_PERSISTENT: /tmp/pw-profile-1
+        run: VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
+      - name: Chunk 7, persistent context
+        env:
+          VITEST_BROWSER: webkit
+          VITEST_PERSISTENT: /tmp/pw-profile-2
         run: |
-          if [ "${{ matrix.set }}" = probe ]; then
-            VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
-          elif [ "${{ matrix.set }}" = chunk7 ]; then
-            rm test/spec/zzCookieProbe_spec.js
-            TEST_CHUNKS=8 TEST_CHUNK=7 npm run test:vitest || true
-          else
-            VITEST_FILES=test/spec/zzCookieProbe_spec.js,test/spec/modules/a1MediaRtdProvider_spec.js,test/spec/modules/kargoBidAdapter_spec.js,test/spec/modules/transfonSecurityRtdProvider_spec.js,test/spec/modules/userId_spec.js,test/spec/modules/uid2IdSystem_spec.js,test/spec/modules/criteoIdSystem_spec.js npm run test:vitest || true
-          fi
+          rm test/spec/zzCookieProbe_spec.js
+          TEST_CHUNKS=8 TEST_CHUNK=7 npm run test:vitest || true
