@@ -164,6 +164,27 @@ describe('cookie probe', () => {
     log(`M${gap} stale`, { staleDelete, staleDeleteLater, staleOverwrite, staleOverwriteLater });
   }));
 
+  [0, 2, 5].forEach(busy => it(`P${busy}: 100 rounds of set, busy ${busy}ms, delete; sample for 500ms`, async function () {
+    this.timeout(120000);
+    const samples = [0, 5, 20, 100, 500];
+    const stale = Object.fromEntries(samples.map(s => [s, 0]));
+    let staleImmediately = 0;
+    for (let i = 0; i < 100; i++) {
+      const name = `probeP${busy}_${i}`;
+      document.cookie = `${name}=v; path=/`;
+      const t0 = performance.now(); while (performance.now() - t0 < busy);
+      document.cookie = `${name}=; expires=${PAST}; path=/`;
+      if (read(name) !== null) staleImmediately++;
+      let elapsed = 0;
+      for (const s of samples) {
+        await wait(s - elapsed); elapsed = s;
+        if (read(name) !== null) stale[s]++;
+      }
+      if (i % 50 === 49) log(`P${busy} progress ${i + 1}`, { staleImmediately, stale });
+    }
+    log(`P${busy} stale by sample ms`, { staleImmediately, stale });
+  }));
+
   it('I: clock check', () => {
     log('I Date.now', Date.now());
     log('I UTC', new Date().toUTCString());

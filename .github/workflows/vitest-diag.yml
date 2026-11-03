@@ -9,7 +9,7 @@ permissions:
   contents: read
 jobs:
   diag:
-    name: Diag webkit macos (sequential)
+    name: Diag Safari vs Playwright WebKit (macOS)
     runs-on: macos-latest
     timeout-minutes: 240
     defaults:
@@ -24,20 +24,17 @@ jobs:
           node-version-file: '.nvmrc'
       - run: npm ci
       - run: npx playwright install --with-deps webkit
-      - run: npx gulp precompile
-      - name: Probe, ephemeral context
-        env:
-          VITEST_BROWSER: webkit
-        run: VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
-      - name: Probe, persistent context
-        env:
-          VITEST_BROWSER: webkit
-          VITEST_PERSISTENT: /tmp/pw-profile-1
-        run: VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
-      - name: Chunk 7, persistent context
-        env:
-          VITEST_BROWSER: webkit
-          VITEST_PERSISTENT: /tmp/pw-profile-2
+      - name: Configure Safari
         run: |
-          rm test/spec/zzCookieProbe_spec.js
-          TEST_CHUNKS=8 TEST_CHUNK=7 npm run test:vitest || true
+          defaults write com.apple.Safari IncludeDevelopMenu YES
+          defaults write com.apple.Safari AllowRemoteAutomation 1
+          sudo safaridriver --enable
+          /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" /Applications/Safari.app/Contents/Info.plist || true
+          sw_vers
+      - run: npx gulp precompile
+      - name: Probe, Playwright WebKit
+        env:
+          VITEST_BROWSER: webkit
+        run: VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
+      - name: Probe, Safari (Karma SafariNative)
+        run: npx gulp test-only-nobuild --browsers SafariNative --file test/spec/zzCookieProbe_spec.js --no-coverage || true
