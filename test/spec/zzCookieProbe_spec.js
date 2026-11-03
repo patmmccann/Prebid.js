@@ -130,6 +130,40 @@ describe('cookie probe', () => {
     log('K after delete', read('probeK'));
   });
 
+  it('L: set then delete in the same task, read later', async () => {
+    document.cookie = 'probeL=1; path=/';
+    read('probeL');
+    document.cookie = `probeL=; expires=${PAST}; path=/`;
+    log('L sync', read('probeL'));
+    await wait(0);
+    log('L +0ms', read('probeL'));
+    await wait(50);
+    log('L +50ms', read('probeL'));
+    await wait(500);
+    log('L +550ms', read('probeL'));
+  });
+
+  [0, 1, 5, 20].forEach(gap => it(`M${gap}: 100 rounds of set, ${gap}ms, delete/overwrite, check now and 20ms later`, async function () {
+    this.timeout(60000);
+    let staleDelete = 0; let staleDeleteLater = 0; let staleOverwrite = 0; let staleOverwriteLater = 0;
+    for (let i = 0; i < 100; i++) {
+      document.cookie = `probeM=a${i}; path=/`;
+      await wait(gap);
+      document.cookie = `probeM=; expires=${PAST}; path=/`;
+      if (read('probeM') !== null) staleDelete++;
+      await wait(20);
+      if (read('probeM') !== null) staleDeleteLater++;
+      document.cookie = `probeN=a${i}; path=/`;
+      await wait(gap);
+      document.cookie = `probeN=b${i}; path=/`;
+      if (read('probeN') !== `b${i}`) staleOverwrite++;
+      await wait(20);
+      if (read('probeN') !== `b${i}`) staleOverwriteLater++;
+    }
+    document.cookie = `probeN=; expires=${PAST}; path=/`;
+    log(`M${gap} stale`, { staleDelete, staleDeleteLater, staleOverwrite, staleOverwriteLater });
+  }));
+
   it('I: clock check', () => {
     log('I Date.now', Date.now());
     log('I UTC', new Date().toUTCString());
