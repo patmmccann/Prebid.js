@@ -15,7 +15,8 @@
 //   TEST_CHUNK     which chunk to build (1-based); omit to build every spec
 //   TEST_PAT       spec file pattern (default *_spec.js)
 //   VITEST_SOURCEMAPS=1  emit inline source maps (slower, larger)
-//   VITEST_COVERAGE=1    instrument with babel-plugin-istanbul, as karma does with coverage on
+//   VITEST_COVERAGE=1    instrument with babel-plugin-istanbul, as karma does with coverage on, and write
+//                        lcov to build/coverage/chunks/<chunk>/lcov.info (see README.md, "Coverage")
 //
 // Run `npx gulp precompile` first, exactly as for `test-only-nobuild`.
 const path = require('path');
@@ -26,6 +27,7 @@ const glob = require('glob');
 const webpack = require('webpack');
 const karmaConfMaker = require('../../karma.conf.maker.js');
 const helpers = require('../../gulpHelpers.js');
+const { readPrecompilationKey } = require('../../gulp.cache.js');
 
 const ROOT = path.resolve(__dirname, '../..');
 // the test files Vitest collects (one small ES module per spec)
@@ -91,7 +93,9 @@ function makeConfig ({ groups, pipeline }) {
   config.entry = Object.fromEntries(groups.map(group => {
     return [group.name, [...pre, ...group.specs, ...post].map(f => helpers.getPrecompiledPath(f))];
   }));
-  config.devtool = process.env.VITEST_SOURCEMAPS ? 'inline-source-map' : false;
+  // with coverage, source maps also let babel-plugin-istanbul record each file's inputSourceMap, which
+  // coverage.js uses to map counters back to the original sources (as karma-coverage does)
+  config.devtool = process.env.VITEST_SOURCEMAPS || coverage ? 'inline-source-map' : false;
   config.output = {
     ...config.output,
     path: SCRIPTS,
@@ -118,10 +122,13 @@ function makeConfig ({ groups, pipeline }) {
           },
         },
       };
+  // Keyed like karma's own cache (karma.conf.maker.js): on what dist/src was precompiled as, since the
+  // default and all-features-disabled trees have the same paths; and on the build configuration itself.
   config.cache = {
     type: 'filesystem',
     cacheDirectory: path.resolve(ROOT, '.cache/webpack-vitest'),
-    version: JSON.stringify({ coverage, pipeline }),
+    version: JSON.stringify({ precompilation: readPrecompilationKey(), coverage, pipeline }),
+    buildDependencies: { config: [__filename, path.join(ROOT, 'karma.conf.maker.js'), path.join(ROOT, 'babelConfig.js')] },
   };
   config.stats = 'errors-warnings';
   if (!process.env.VITEST_SOURCEMAPS) {
