@@ -78,7 +78,7 @@ export default defineConfig({
       headless: true,
       // Playwright's Chromium already passes the karma-chrome-launcher flags that matter (no popup blocking,
       // no background timer throttling) and --no-sandbox, as karma's ChromeNoSandbox launcher does
-      provider: playwright({ launchOptions }),
+      provider: playwright({ launchOptions, ...(process.env.VITEST_PERSISTENT ? { persistentContext: process.env.VITEST_PERSISTENT } : {}) }),
       // named after the channel when there is one, so the reporter says "msedge" rather than "chromium"
       instances: [{ browser: browserName, name: process.env.VITEST_CHANNEL || browserName }],
       screenshotFailures: false,

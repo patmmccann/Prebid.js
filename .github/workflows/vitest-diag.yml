@@ -3,18 +3,20 @@ on:
   pull_request:
     paths:
       - '.github/workflows/vitest-diag.yml'
+      - 'test/vitest-webpack/**'
       - 'test/spec/zzCookieProbe_spec.js'
 permissions:
   contents: read
 jobs:
   diag:
-    name: Diag ${{ matrix.browser }} ${{ matrix.os }} (${{ matrix.set }})
+    name: Diag ${{ matrix.browser }} ${{ matrix.os }} (${{ matrix.set }}, persistent=${{ matrix.persistent }})
     strategy:
       fail-fast: false
       matrix:
         os: [macos-latest]
         browser: [webkit]
-        set: [probe, specs, chunk7]
+        set: [probe, chunk7]
+        persistent: ["", "/tmp/pw-profile"]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 240
     defaults:
@@ -34,10 +36,12 @@ jobs:
       - name: Run
         env:
           VITEST_BROWSER: ${{ matrix.browser }}
+          VITEST_PERSISTENT: ${{ matrix.persistent }}
         run: |
           if [ "${{ matrix.set }}" = probe ]; then
             VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
           elif [ "${{ matrix.set }}" = chunk7 ]; then
+            rm test/spec/zzCookieProbe_spec.js
             TEST_CHUNKS=8 TEST_CHUNK=7 npm run test:vitest || true
           else
             VITEST_FILES=test/spec/zzCookieProbe_spec.js,test/spec/modules/a1MediaRtdProvider_spec.js,test/spec/modules/kargoBidAdapter_spec.js,test/spec/modules/transfonSecurityRtdProvider_spec.js,test/spec/modules/userId_spec.js,test/spec/modules/uid2IdSystem_spec.js,test/spec/modules/criteoIdSystem_spec.js npm run test:vitest || true
