@@ -104,6 +104,32 @@ describe('cookie probe', () => {
     log('H after delete +500ms', read('probeH'));
   });
 
+  [50, 100, 150, 200, 300].forEach(n => it(`J${n}: with ${n} other cookies, overwrite and delete`, async () => {
+    for (let i = 0; i < n; i++) document.cookie = `probeFill${i}=${'x'.repeat(20)}; path=/`;
+    log(`J${n} filled`, document.cookie.split('; ').filter(c => c.startsWith('probeFill')).length);
+    document.cookie = 'probeJ=1; path=/';
+    log(`J${n} after set`, read('probeJ'));
+    await wait(0);
+    document.cookie = 'probeJ=2; path=/';
+    log(`J${n} after overwrite`, read('probeJ'));
+    document.cookie = `probeJ=; expires=${PAST}; path=/`;
+    log(`J${n} after delete`, read('probeJ'));
+    await wait(100);
+    log(`J${n} after delete +100ms`, read('probeJ'));
+    document.cookie = 'probeJnew=1; path=/';
+    log(`J${n} new cookie`, read('probeJnew'));
+    document.cookie = `probeJnew=; expires=${PAST}; path=/`;
+  }));
+
+  it('K: clean up fill cookies', async () => {
+    for (let i = 0; i < 300; i++) document.cookie = `probeFill${i}=; expires=${PAST}; path=/`;
+    log('K remaining fill', document.cookie.split('; ').filter(c => c.startsWith('probeFill')).length);
+    document.cookie = 'probeK=1; path=/';
+    await wait(0);
+    document.cookie = `probeK=; expires=${PAST}; path=/`;
+    log('K after delete', read('probeK'));
+  });
+
   it('I: clock check', () => {
     log('I Date.now', Date.now());
     log('I UTC', new Date().toUTCString());

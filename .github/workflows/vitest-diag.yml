@@ -14,16 +14,9 @@ jobs:
       matrix:
         os: [macos-latest]
         browser: [webkit]
-        set: [probe, specs]
-        include:
-          - os: ubuntu-latest
-            browser: webkit
-            set: probe
-          - os: ubuntu-latest
-            browser: chromium
-            set: probe
+        set: [probe, specs, chunk7]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 240
     defaults:
       run:
         shell: bash
@@ -44,6 +37,8 @@ jobs:
         run: |
           if [ "${{ matrix.set }}" = probe ]; then
             VITEST_FILES=test/spec/zzCookieProbe_spec.js npm run test:vitest || true
+          elif [ "${{ matrix.set }}" = chunk7 ]; then
+            TEST_CHUNKS=8 TEST_CHUNK=7 npm run test:vitest || true
           else
             VITEST_FILES=test/spec/zzCookieProbe_spec.js,test/spec/modules/a1MediaRtdProvider_spec.js,test/spec/modules/kargoBidAdapter_spec.js,test/spec/modules/transfonSecurityRtdProvider_spec.js,test/spec/modules/userId_spec.js,test/spec/modules/uid2IdSystem_spec.js,test/spec/modules/criteoIdSystem_spec.js npm run test:vitest || true
           fi
