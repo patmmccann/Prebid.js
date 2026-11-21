@@ -38,6 +38,18 @@ creative and native-ad data, remote configuration, URLs, and messages from other
 windows or frames. Identify which actor can actually control each input. A message
 type or an ad identifier alone does not demonstrate that its sender is authorized.
 
+Of particular interest is a publisher that chooses SafeFrames or another isolated
+or safe-rendering integration to prevent ad JavaScript from executing in the top
+frame. Assume a configured bidder, creative, or other network host can be
+compromised and return hostile responses. Choosing to communicate with that host,
+including over HTTPS, does not by itself authorize its responses to execute as
+JavaScript in the publisher's top frame.
+
+Follow those responses through receipt, parsing, adapter interpretation, asset
+loading, callbacks, messaging, and rendering. Code handling a response before it
+reaches the creative frame is part of this boundary too. Trusted core or adapter
+code executing in the top frame does not make the remote data it processes trusted.
+
 Distinguish the publisher page from cross-origin creative frames, the browser from
 remote services, and untrusted contribution content from privileged CI and release
 execution. Browser-origin protections and integration-specific frame settings are
@@ -52,6 +64,11 @@ already enforces them:
 - External data must not modify shared JavaScript prototypes or become executable
   code in a more privileged context through parsing, merging, or interpolation.
   Review both shared helpers and adapter-specific parsing and data handling.
+- When a publisher selects creative isolation to prevent top-frame ad execution,
+  hostile bid responses, creative data, and responses from compromised configured
+  hosts must not obtain that execution through preprocessing, asset loading,
+  callbacks, messaging, or rendering. A rendering failure must not silently
+  downgrade the selected isolation to top-frame execution.
 - Creative messaging and rendering must preserve the intended frame boundary.
   Requests, replies, native actions, and render events must be associated with the
   appropriate bid and permitted action, without exposing unrelated sensitive data
@@ -87,17 +104,38 @@ State when an issue requires an optional module or a particular configuration;
 neither condition alone makes it unreportable. For dependency advisories, explain
 whether the vulnerable behavior is reachable in a shipped bundle or a build/CI path.
 
-## Scope Limits and Known Limitations
+### Priority: Publisher-Selected Creative Isolation
 
-This policy establishes no blanket finding-class exclusions or accepted risks.
-Any proposed exception needs an explicit maintainer decision with its scope and
-rationale. Missing evidence about an integration or control is an uncertainty to
-record, rather than proof that a finding is safe.
+Prioritize cases where a publisher configures SafeFrames or a safe-rendering path
+to keep ad JavaScript out of the top frame, but attacker-controlled bid or network
+responses defeat that choice. Top-frame execution during response processing is
+reportable even if the final creative is subsequently placed in an isolated frame.
+
+Show the publisher configuration and intended protection, the fields or responses
+the attacker controls, and the path to unintended execution or privileged access.
+A compromised remote host is a valid attacker precondition for assessing this
+client-side boundary; the host compromise alone is not a Prebid.js finding. Assess
+whether the selected integration provides the intended protection in practice,
+rather than relying on a renderer's name or the mere presence of an iframe.
+
+## Scope Limits, Accepted Risk, and Known Limitations
 
 Creative HTML, scripts, and external renderers are intentionally executed in their
-intended rendering context. Assess whether attacker-controlled data gains an
-unintended capability or crosses a boundary; the presence of an execution sink
-alone does not establish that impact.
+intended rendering context. A publisher knowingly choosing to run ads or ad scripts
+in the top frame accepts the security risks inherent in granting that execution.
+That intended execution and the capabilities it directly grants are not, by
+themselves, Prebid.js vulnerabilities.
+
+This accepted risk does not cover defeating a publisher's choice to prevent
+top-frame ad execution through SafeFrames or another safe-rendering integration.
+Nor does permission to contact a host alone count as permission to execute ad code
+returned by that host in the top frame. Assess whether the response gains an
+unintended capability or crosses the selected boundary.
+
+Beyond this explicit deployment choice, this policy establishes no blanket
+finding-class exclusions or accepted risks. Further exceptions need an explicit
+maintainer decision with scope and rationale. Missing evidence about an integration
+or control is an uncertainty to record, rather than proof that a finding is safe.
 
 Privacy behavior depends on the selected modules, CMP integration, publisher
 configuration, rule priorities, and timing. Activity checks allow an operation when
